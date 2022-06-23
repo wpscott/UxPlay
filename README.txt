@@ -55,6 +55,7 @@ screen-sharing applications such as Zoom) on a host running Linux,
 macOS, or other unix. UxPlay supports Apple's AirPlay 2 protocol using
 "Legacy Pairing", but some features are missing. (Details of what is
 publically known about Apple's AirPlay 2 protocol can be found
+[here](https://openairplay.github.io/airplay-spec/),
 [here](https://github.com/SteeBono/airplayreceiver/wiki/AirPlay2-Protocol)
 and [here](https://emanuelecozzi.net/docs/airplay2)).
 
