@@ -6,9 +6,9 @@
 Highlights:
 
    * GPLv3, open source.
-   * Support for both AirPlay Mirror and AirPlay Audio-only (Apple Lossless
-     ALAC) streaming protocols 
-     from current iOS/iPadOS 15.5 clients.
+   * Originally supported only AirPlay Mirror protocol, now has added support
+     for AirPlay Audio-only (Apple Lossless ALAC) streaming 
+     from current iOS/iPadOS 15.5 clients.  **There is no support for Airplay video-streaming protocol.**
    * macOS computers (2011 or later, both Intel and "Apple Silicon" M1
      systems) can act either as AirPlay clients, or
      as the server running UxPlay. Using AirPlay, UxPlay can
@@ -187,20 +187,19 @@ for a distribution, use the cmake option `-DNO_MARCH_NATIVE=ON`.
    such as Zoom, see [ZOOMFIX compile-time option](#zoomfix-compile-time-option) below).
    **ZOOMFIX  is only needed for GStreamer-1.18.x or earlier**.
 5. `make`
-6. `sudo make install`    (you can afterwards uninstall
-    with `sudo make uninstall` in the same directory in which this was run)
-7.  Install GStreamer plugins that you
-    need: `sudo apt-get install gstreamer1.0-<plugin>`; values of
-    `<plugin>` needed are: "**plugins-base**", "**libav**" (for sound),
-    "**plugins-good**" (for v4l2 hardware h264 decoding)
-    and  "**plugins-bad**" (for h264 decoding).   Also needed may
-    be "**gl**" for OpenGL support (which may be useful, and should
-    be used with h264 decoding by the NVIDIA GPU), and "**x**" for
-    X11 support, although these may  already be installed; "**vaapi**"
-    is needed for hardware-accelerated h264 video decoding by Intel
-    or AMD  graphics (but not for use with NVIDIA using proprietary drivers).
-    Also install "**tools**" to get the utility gst-inspect-1.0 for
-    examining the GStreamer installation.
+6. `sudo make install` (you can afterwards uninstall with ``sudo make uninstall``
+   in the same directory in which this was run).
+7. Install GStreamer plugins that you need: `sudo apt-get install gstreamer1.0-<plugin>`;
+   values of `<plugin>` needed are: "**plugins-base**", "**libav**" (for sound),
+   "**plugins-good**" (for v4l2 hardware h264 decoding)
+   and  "**plugins-bad**" (for h264 decoding).   Also needed may
+   be "**gl**" for OpenGL support (which may be useful, and should
+   be used with h264 decoding by the NVIDIA GPU), and "**x**" for
+   X11 support, although these may  already be installed; "**vaapi**"
+   is needed for hardware-accelerated h264 video decoding by Intel
+   or AMD  graphics (but not for use with NVIDIA using proprietary drivers).
+   Also install "**tools**" to get the utility gst-inspect-1.0 for
+   examining the GStreamer installation.
 
 _If you intend to modify the code, use a separate "build" directory:
 replace_  "`cmake  [ ] .`" _by_  "``mkdir build ; cd build ; cmake [ ] ..``"; _you can then clean
@@ -225,11 +224,11 @@ UxPlay from receiving client connection requests unless some network ports
 are opened. See [Troubleshooting](#troubleshooting) below for
 help with this or other problems.
 
-One common problem involves GStreamer
+**One common problem involves GStreamer
 attempting to use incorrectly-configured or absent accelerated hardware h264
 video decoding (e.g., VAAPI).
 Try "`uxplay -avdec`" to force software video decoding; if this works you can
-then try to fix accelerated hardware video decoding if you need it.
+then try to fix accelerated hardware video decoding if you need it.**
 See [Usage](#usage) for more run-time options.
 
 **Raspberry Pi**: GStreamer-1.18.4 or later required for hardware video decoding; for 1.20 or earlier, also see
@@ -632,7 +631,7 @@ default limit is not right  for your network,  it can be modified using the opti
 starts to recover after ntp timeouts, a corrupt video packet from before the timeout may trigger a "connection reset by peer"  error, which also causes UxPlay to reset the
 connection. When the connection is reset, the "frozen" mirror screen of the previous connection is left in place, and will be taken over by a new client connection when it is made.
 
-### 6.  Failure to decrypt ALL video and audio streams from old or non-Apple clients:
+### 6. Protocol issues, such as failure to decrypt ALL video and audio streams from old or non-Apple clients:
 
 This triggers an unending stream of error messages, and means that the
 audio decryption key (also used in video decryption) 
@@ -640,7 +639,8 @@ was not correctly extracted from data sent by the  client.
 This should not happen for iOS 9.3 or later clients.  However, if a client 
 uses the same  older version of the protocol that is used by the Windows-based
 AirPlay client emulator _AirMyPC_, the protocol can be switched to the older version
-by the setting ```OLD_PROTOCOL_CLIENT_USER_AGENT_LIST``` in lib/global.h.
+by the setting ```OLD_PROTOCOL_CLIENT_USER_AGENT_LIST``` 
+in `UxPlay/lib/global.h`.
 UxPlay reports the  client's "User Agent" string when it connects. If 
 some other client also fails to decrypt all audio and video, try adding 
 its "User Agent" string in place of "xxx" in the  entry "AirMyPC/2.0;xxx" 
@@ -657,6 +657,7 @@ sourceVersion 380.20.1 (an AppleTV 4K 1st gen, introduced 2017, running
 tvOS 12.2.1); it seems that the use of "legacy" protocol just requires bit 27 (listed as
 "SupportsLegacyPairing") of the
 "features" plist code (reported to the client by the AirPlay server) to be set.
+The "features" code and other settings are set in `UxPlay/lib/dnssdint.h`.
 
 # ChangeLog
 1.53 2022-06-13   Internal changes to  audio sync code, revised documentation, 
