@@ -521,7 +521,7 @@ displays streamed video.
 
 **-ca *filename*** provides a file (where *filename* can include a full
 path) used for output of "cover art" (from Apple Music, *etc.*,) in
-audio-only ALAC mode. This file is ovewritten with the latest cover art
+audio-only ALAC mode. This file is overwritten with the latest cover art
 as it arrives. Cover art (jpeg format) is discarded if this option is
 not used. Use with a image viewer that reloads the image if it changes,
 or regularly (*e.g.* once per second.). To achieve this, run

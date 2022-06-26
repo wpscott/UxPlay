@@ -448,7 +448,7 @@ which will not work if a firewall is running.
 **-as 0**  (or just **-a**) suppresses playing of streamed audio, but displays streamed video.
 
 **-ca _filename_** provides a file (where _filename_ can include a full path) used for output of "cover art"
-   (from Apple Music, _etc._,) in audio-only ALAC mode.   This file is ovewritten with the latest cover art as
+   (from Apple Music, _etc._,) in audio-only ALAC mode.   This file is overwritten with the latest cover art as
    it arrives.   Cover art (jpeg format) is discarded if this option is not used.    Use with a image viewer that reloads the image
    if it changes, or regularly (_e.g._ once per second.).    To achieve this,  run "`uxplay -ca [path/to/]filename &`" in the background,
    then run the the image viewer in the foreground.   Example, using `feh` as the viewer: run "``feh -R 1 [path/to/]filename``" (in
