@@ -8,7 +8,7 @@ Highlights:
    * GPLv3, open source.
    * Originally supported only AirPlay Mirror protocol, now has added support
      for AirPlay Audio-only (Apple Lossless ALAC) streaming 
-     from current iOS/iPadOS 15.5 clients.  **There is no support for Airplay2 video-streaming protocol.**
+     from current iOS/iPadOS 15.5 clients.  **There is no support for Airplay2 video-streaming protocol, and none is planned.**
    * macOS computers (2011 or later, both Intel and "Apple Silicon" M1
      systems) can act either as AirPlay clients, or
      as the server running UxPlay. Using AirPlay, UxPlay can
@@ -21,8 +21,8 @@ Highlights:
      "audiosinks", and a fully-user-configurable video streaming pipeline).
    * Support for server behind a firewall.
    * **New**: Support for Raspberry Pi, with hardware video acceleration using
-     Video4Linux2 (which supports both 32- and 64-bit systems, unlike deprecated
-     OpenMAX (omx), which it replaces). (For GStreamer < 1.22,
+     Video4Linux2 (vl42), which supports both 32- and 64-bit systems, unlike deprecated
+     OpenMAX (omx), which is being dropped by RPi distributions in favor of v4l2. (For GStreamer < 1.22,
      a [patch](https://github.com/FDH2/UxPlay/wiki/Gstreamer-Video4Linux2-plugin-patches)
      to the GStreamer Video4Linux2 plugin, available in the
      [UxPlay Wiki](https://github.com/FDH2/UxPlay/wiki), is required, unless
@@ -33,7 +33,7 @@ Highlights:
 This project is a GPLv3 open source unix AirPlay2 Mirror server for Linux, macOS, and \*BSD.
 It was initially developed by
 [antimof](http://github.com/antimof/Uxplay) using code 
-from [RPiPlay](https://github.com/FD-/RPiPlay), which in turn derives from
+from OpenMAX-based [RPiPlay](https://github.com/FD-/RPiPlay), which in turn derives from
 [AirplayServer](https://github.com/KqsMea8/AirplayServer),
 [shairplay](https://github.com/juhovh/shairplay), and [playfair](https://github.com/EstebanKubata/playfair).
 (The antimof site is no longer involved in
@@ -65,10 +65,10 @@ through the avahi-daemon service, and is included in  most Linux distributions (
 service can also be provided by macOS, iOS or Windows servers).
 
 Connections to the UxPlay server by
-iOS/MacOS  clients can be initiated both in _**AirPlay Mirror**_ mode (which streams
+iOS/MacOS  clients can be initiated both in **AirPlay Mirror** mode (which streams
 lossily-compressed AAC audio while mirroring the client screen,
-or in the alternative _**AirPlay Audio**_ mode which streams
-Apple Lossless (ALAC) audio without screen mirroring. In _**Audio**_ mode,
+or in the alternative **AirPlay Audio** mode which streams
+Apple Lossless (ALAC) audio without screen mirroring. In **Audio** mode,
 metadata is displayed in the uxplay terminal;
 if UxPlay option ``-ca <name>`` is used,
 the accompanying cover art is also output 
@@ -76,16 +76,16 @@ to a periodically-updated file `<name>`, and can be viewed with
 a (reloading) graphics viewer of your choice such as `feh`:
 run "`uxplay -ca <name> &`" in the background, then run "``feh -R 1 <name>``"
 in the foreground; terminate with "`ctrl-C fg ctrl-C`".
-_Switching between **Mirror** and **Audio** modes  during an active  connection is
-possible: in **Mirror** mode, close the mirror window and start an **Audio** mode connection,
-switch back by initiating a **Mirror** mode connection._
+_Switching between_ **Mirror** _and_ **Audio** _modes  during an active  connection is
+possible: in_ **Mirror** _mode, stop mirroring (or close the mirror window) and start an_ **Audio** _mode connection,
+switch back by initiating a_ **Mirror** _mode connection._
 
-* **Note that Apple DRM
-(as found in Apple TV app content on the client) cannot be decrypted by UxPlay,
+* **Note that Apple video-DRM
+(as found in AppleTV.app content on the client) cannot be decrypted by UxPlay,
 and (unlike a true AppleTV), the UxPlay server does not allow the Apple
 client to run a http connection on the server that directly streams
 content from the internet to the server, instead of 
-streaming it to the client, and then re-streaming to the server.  DRM-free apps like youtube.app
+streaming it to the client, and then re-streaming to the server. Unlike AppleTV.app,  DRM-free apps like youtube.app
 can be viewed  and listened to in Mirror mode, but using the youtube.app icon for AirPlay video will only send
 ALAC sound  without the accompanying  video.**
 
@@ -270,8 +270,8 @@ gstreamer1-devel gstreamer1-plugins-base-devel gstreamer1-libav gstreamer1-plugi
  * **OpenSUSE:**
 (sudo zypper install) libopenssl-devel libplist-devel
 avahi-compat-mDNSResponder-devel (+ libX11-devel for ZOOMFIX).  The required
-GStreamer packages are: gstreamer-devel gstreamer-plugins-base-devel gstreamer-plugins-libav gstreamer-plugins-bad (+ gstreamer-plugins-vaapi for Intel graphics);
-you may need to use the version of gstreamer-plugins-libav for OpenSUSE from [Packman](https://ftp.gwdg.de/pub/linux/misc/packman/suse/) "Essentials".
+GStreamer packages are: gstreamer-devel gstreamer-plugins-base-devel gstreamer-plugins-libav gstreamer-plugins-bad (+ gstreamer-plugins-vaapi for Intel graphics); in some cases, 
+you may need to use gstreamer packages for OpenSUSE from [Packman](https://ftp.gwdg.de/pub/linux/misc/packman/suse/) "Essentials".
 
 
 * **Arch Linux**

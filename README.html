@@ -13,7 +13,7 @@ href="https://github.com/FDH2/UxPlay">https://github.com/FDH2/UxPlay</a>
 <li>Originally supported only AirPlay Mirror protocol, now has added
 support for AirPlay Audio-only (Apple Lossless ALAC) streaming from
 current iOS/iPadOS 15.5 clients. <strong>There is no support for
-Airplay2 video-streaming protocol.</strong></li>
+Airplay2 video-streaming protocol, and none is planned.</strong></li>
 <li>macOS computers (2011 or later, both Intel and “Apple Silicon” M1
 systems) can act either as AirPlay clients, or as the server running
 UxPlay. Using AirPlay, UxPlay can emulate a second display for macOS
@@ -27,9 +27,9 @@ to select different hardware-appropriate output “videosinks” and
 pipeline).</li>
 <li>Support for server behind a firewall.</li>
 <li><strong>New</strong>: Support for Raspberry Pi, with hardware video
-acceleration using Video4Linux2 (which supports both 32- and 64-bit
-systems, unlike deprecated OpenMAX (omx), which it replaces). (For
-GStreamer &lt; 1.22, a <a
+acceleration using Video4Linux2 (vl42), which supports both 32- and
+64-bit systems, unlike deprecated OpenMAX (omx), which is being dropped
+by RPi distributions in favor of v4l2. (For GStreamer &lt; 1.22, a <a
 href="https://github.com/FDH2/UxPlay/wiki/Gstreamer-Video4Linux2-plugin-patches">patch</a>
 to the GStreamer Video4Linux2 plugin, available in the <a
 href="https://github.com/FDH2/UxPlay/wiki">UxPlay Wiki</a>, is required,
@@ -40,9 +40,9 @@ reports</a>.</li>
 </ul>
 <p>This project is a GPLv3 open source unix AirPlay2 Mirror server for
 Linux, macOS, and *BSD. It was initially developed by <a
-href="http://github.com/antimof/Uxplay">antimof</a> using code from <a
-href="https://github.com/FD-/RPiPlay">RPiPlay</a>, which in turn derives
-from <a
+href="http://github.com/antimof/Uxplay">antimof</a> using code from
+OpenMAX-based <a href="https://github.com/FD-/RPiPlay">RPiPlay</a>,
+which in turn derives from <a
 href="https://github.com/KqsMea8/AirplayServer">AirplayServer</a>, <a
 href="https://github.com/juhovh/shairplay">shairplay</a>, and <a
 href="https://github.com/EstebanKubata/playfair">playfair</a>. (The
@@ -75,32 +75,33 @@ the avahi-daemon service, and is included in most Linux distributions
 (this service can also be provided by macOS, iOS or Windows
 servers).</p>
 <p>Connections to the UxPlay server by iOS/MacOS clients can be
-initiated both in <em><strong>AirPlay Mirror</strong></em> mode (which
-streams lossily-compressed AAC audio while mirroring the client screen,
-or in the alternative <em><strong>AirPlay Audio</strong></em> mode which
-streams Apple Lossless (ALAC) audio without screen mirroring. In
-<em><strong>Audio</strong></em> mode, metadata is displayed in the
-uxplay terminal; if UxPlay option <code>-ca &lt;name&gt;</code> is used,
-the accompanying cover art is also output to a periodically-updated file
+initiated both in <strong>AirPlay Mirror</strong> mode (which streams
+lossily-compressed AAC audio while mirroring the client screen, or in
+the alternative <strong>AirPlay Audio</strong> mode which streams Apple
+Lossless (ALAC) audio without screen mirroring. In
+<strong>Audio</strong> mode, metadata is displayed in the uxplay
+terminal; if UxPlay option <code>-ca &lt;name&gt;</code> is used, the
+accompanying cover art is also output to a periodically-updated file
 <code>&lt;name&gt;</code>, and can be viewed with a (reloading) graphics
 viewer of your choice such as <code>feh</code>: run
 “<code>uxplay -ca &lt;name&gt; &amp;</code>” in the background, then run
 “<code>feh -R 1 &lt;name&gt;</code>” in the foreground; terminate with
-“<code>ctrl-C fg ctrl-C</code>”. <em>Switching between
-<strong>Mirror</strong> and <strong>Audio</strong> modes during an
-active connection is possible: in <strong>Mirror</strong> mode, close
-the mirror window and start an <strong>Audio</strong> mode connection,
-switch back by initiating a <strong>Mirror</strong> mode
-connection.</em></p>
+“<code>ctrl-C fg ctrl-C</code>”. <em>Switching between</em>
+<strong>Mirror</strong> <em>and</em> <strong>Audio</strong> <em>modes
+during an active connection is possible: in</em> <strong>Mirror</strong>
+<em>mode, stop mirroring (or close the mirror window) and start an</em>
+<strong>Audio</strong> <em>mode connection, switch back by initiating
+a</em> <strong>Mirror</strong> <em>mode connection.</em></p>
 <ul>
-<li><strong>Note that Apple DRM (as found in Apple TV app content on the
-client) cannot be decrypted by UxPlay, and (unlike a true AppleTV), the
-UxPlay server does not allow the Apple client to run a http connection
-on the server that directly streams content from the internet to the
-server, instead of streaming it to the client, and then re-streaming to
-the server. DRM-free apps like youtube.app can be viewed and listened to
-in Mirror mode, but using the youtube.app icon for AirPlay video will
-only send ALAC sound without the accompanying video.</strong></li>
+<li><strong>Note that Apple video-DRM (as found in AppleTV.app content
+on the client) cannot be decrypted by UxPlay, and (unlike a true
+AppleTV), the UxPlay server does not allow the Apple client to run a
+http connection on the server that directly streams content from the
+internet to the server, instead of streaming it to the client, and then
+re-streaming to the server. Unlike AppleTV.app, DRM-free apps like
+youtube.app can be viewed and listened to in Mirror mode, but using the
+youtube.app icon for AirPlay video will only send ALAC sound without the
+accompanying video.</strong></li>
 </ul>
 <h3
 id="possibility-for-using-hardware-accelerated-h264-video-decoding-if-available.">Possibility
@@ -302,9 +303,8 @@ graphics).</p></li>
 libplist-devel avahi-compat-mDNSResponder-devel (+ libX11-devel for
 ZOOMFIX). The required GStreamer packages are: gstreamer-devel
 gstreamer-plugins-base-devel gstreamer-plugins-libav
-gstreamer-plugins-bad (+ gstreamer-plugins-vaapi for Intel graphics);
-you may need to use the version of gstreamer-plugins-libav for OpenSUSE
-from <a
+gstreamer-plugins-bad (+ gstreamer-plugins-vaapi for Intel graphics); in
+some cases, you may need to use gstreamer packages for OpenSUSE from <a
 href="https://ftp.gwdg.de/pub/linux/misc/packman/suse/">Packman</a>
 “Essentials”.</p></li>
 <li><p><strong>Arch Linux</strong> (sudo pacman -Syu) openssl libplist
