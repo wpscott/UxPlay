@@ -78,7 +78,7 @@ run "`uxplay -ca <name> &`" in the background, then run "``feh -R 1 <name>``"
 in the foreground; terminate with "`ctrl-C fg ctrl-C`".
 _Switching between_ **Mirror** _and_ **Audio** _modes  during an active  connection is
 possible: in_ **Mirror** _mode, stop mirroring (or close the mirror window) and start an_ **Audio** _mode connection,
-switch back by initiating a_ **Mirror** _mode connection; cover-art display stops/restarts as you leave/re-enter_ **Audio**_ mode._
+switch back by initiating a_ **Mirror** _mode connection; cover-art display stops/restarts as you leave/re-enter_ **Audio** _mode._
 
 * **Note that Apple video-DRM
 (as found in AppleTV.app content on the client) cannot be decrypted by UxPlay,

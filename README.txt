@@ -84,7 +84,7 @@ run "`uxplay -ca <name> &`" in the background, then run
 stop mirroring (or close the mirror window) and start an* **Audio**
 *mode connection, switch back by initiating a* **Mirror** *mode
 connection; cover-art display stops/restarts as you leave/re-enter*
-**Audio**\_ mode.\_
+**Audio** *mode.*
 
 -   **Note that Apple video-DRM (as found in AppleTV.app content on the
     client) cannot be decrypted by UxPlay, and (unlike a true AppleTV),
