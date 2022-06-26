@@ -91,7 +91,9 @@ viewer of your choice such as <code>feh</code>: run
 during an active connection is possible: in</em> <strong>Mirror</strong>
 <em>mode, stop mirroring (or close the mirror window) and start an</em>
 <strong>Audio</strong> <em>mode connection, switch back by initiating
-a</em> <strong>Mirror</strong> <em>mode connection.</em></p>
+a</em> <strong>Mirror</strong> <em>mode connection; cover-art display
+stops/restarts as you leave/re-enter</em> <strong>Audio</strong>_
+mode._</p>
 <ul>
 <li><strong>Note that Apple video-DRM (as found in AppleTV.app content
 on the client) cannot be decrypted by UxPlay, and (unlike a true
@@ -261,7 +263,9 @@ other problems.</p>
 incorrectly-configured or absent accelerated hardware h264 video
 decoding (e.g., VAAPI). Try “<code>uxplay -avdec</code>” to force
 software video decoding; if this works you can then try to fix
-accelerated hardware video decoding if you need it.</strong> See <a
+accelerated hardware video decoding if you need it, or just uninstall
+the GStreamer VAAPI plugin. If your system uses the Wayland compositor
+for graphics, use “<code>uxplay -vs waylandsink</code>”.</strong> See <a
 href="#usage">Usage</a> for more run-time options.</p>
 <p><strong>Raspberry Pi</strong>: GStreamer-1.18.4 or later required for
 hardware video decoding; for 1.20 or earlier, also see <a

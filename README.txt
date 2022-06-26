@@ -83,7 +83,8 @@ run "`uxplay -ca <name> &`" in the background, then run
 *modes during an active connection is possible: in* **Mirror** *mode,
 stop mirroring (or close the mirror window) and start an* **Audio**
 *mode connection, switch back by initiating a* **Mirror** *mode
-connection.*
+connection; cover-art display stops/restarts as you leave/re-enter*
+**Audio**\_ mode.\_
 
 -   **Note that Apple video-DRM (as found in AppleTV.app content on the
     client) cannot be decrypted by UxPlay, and (unlike a true AppleTV),
@@ -259,7 +260,9 @@ for help with this or other problems.
 incorrectly-configured or absent accelerated hardware h264 video
 decoding (e.g., VAAPI). Try "`uxplay -avdec`" to force software video
 decoding; if this works you can then try to fix accelerated hardware
-video decoding if you need it.** See [Usage](#usage) for more run-time
+video decoding if you need it, or just uninstall the GStreamer VAAPI
+plugin. If your system uses the Wayland compositor for graphics, use
+"`uxplay -vs waylandsink`".** See [Usage](#usage) for more run-time
 options.
 
 **Raspberry Pi**: GStreamer-1.18.4 or later required for hardware video
