@@ -1,4 +1,4 @@
-# UxPlay 1.53: AirPlay/AirPlay-Mirror server for Linux, macOS, and Unix.
+# UxPlay 1.54: AirPlay-Mirror and AirPlay-Audio server for Linux, macOS, and Unix.
 
 ### Now developed at the GitHub site <https://github.com/FDH2/UxPlay> (where all user issues should be posted).
 
@@ -7,7 +7,7 @@ Highlights:
 -   GPLv3, open source.
 -   Originally supported only AirPlay Mirror protocol, now has added
     support for AirPlay Audio-only (Apple Lossless ALAC) streaming from
-    current iOS/iPadOS 15.5 clients. **There is no support for Airplay
+    current iOS/iPadOS 15.5 clients. **There is no support for Airplay2
     video-streaming protocol.**
 -   macOS computers (2011 or later, both Intel and "Apple Silicon" M1
     systems) can act either as AirPlay clients, or as the server running
@@ -53,7 +53,7 @@ Its main use is to act like an AppleTV for screen-mirroring (with audio)
 of iOS/iPadOS/macOS clients (iPhones, iPads, MacBooks) in a window on
 the server display (with the possibility of sharing that window on
 screen-sharing applications such as Zoom) on a host running Linux,
-macOS, or other unix. UxPlay supports Apple's AirPlay 2 protocol using
+macOS, or other unix. UxPlay supports Apple's AirPlay2 protocol using
 "Legacy Pairing", but some features are missing. (Details of what is
 publically known about Apple's AirPlay 2 protocol can be found
 [here](https://openairplay.github.io/airplay-spec/),
@@ -70,21 +70,29 @@ included in most Linux distributions (this service can also be provided
 by macOS, iOS or Windows servers).
 
 Connections to the UxPlay server by iOS/MacOS clients can be initiated
-both in AirPlay Mirror mode (which streams lossily-compressed AAC audio
-while mirroring the client screen, or in the alternative AirPlay Audio
-mode which streams Apple Lossless (ALAC) audio without screen mirroring
-(the accompanying cover art in this mode is not displayed, but metadata
-is displayed in the terminal). *Switching between these two modes during
-an active connection is possible: in Mirror mode, close the mirror
-window and start an Audio mode connection, switch back by initiating a
-Mirror mode connection.*
+both in ***AirPlay Mirror*** mode (which streams lossily-compressed AAC
+audio while mirroring the client screen, or in the alternative
+***AirPlay Audio*** mode which streams Apple Lossless (ALAC) audio
+without screen mirroring. In ***Audio*** mode, metadata is displayed in
+the uxplay terminal; if UxPlay option `-ca <name>` is used, the
+accompanying cover art is also output to a periodically-updated file
+`<name>`, and can be viewed with a (reloading) graphics viewer of your
+choice such as `feh`: run "`uxplay -ca <name> &`" in the background,
+then run "`feh -R 1 <name>`" in the foreground; terminate with
+"`ctrl-C fg ctrl-C`". *Switching between **Mirror** and **Audio** modes
+during an active connection is possible: in **Mirror** mode, close the
+mirror window and start an **Audio** mode connection, switch back by
+initiating a **Mirror** mode connection.*
 
 -   **Note that Apple DRM (as found in Apple TV app content on the
     client) cannot be decrypted by UxPlay, and (unlike a true AppleTV),
     the UxPlay server does not allow the Apple client to run a http
     connection on the server that directly streams content from the
     internet to the server, instead of streaming it to the client, and
-    then re-streaming to the server.**
+    then re-streaming to the server. DRM-free apps like youtube.app can
+    be viewed and listened to in Mirror mode, but using the youtube.app
+    icon for AirPlay video will only send ALAC sound without the
+    accompanying video.**
 
 ### Possibility for using hardware-accelerated h264 video-decoding, if available.
 
@@ -795,8 +803,11 @@ code and other settings are set in `UxPlay/lib/dnssdint.h`.
 
 # ChangeLog
 
-1.53 2022-06-13 Internal changes to audio sync code, revised
-documentation, minor bugfix (fix assertion crash when resent audio
+1.53 2022-06-22 Add support for "Cover Art" display in Audio-only (ALAC)
+mode.\
+Reverted a change that caused VAAPI to crash with AMD POLARIS graphics
+cards. Internal changes to plist and audio sync code, revised
+documentation, Minor bugfix (fix assertion crash when resent audio
 packets are empty).
 
 1.52 2022-05-05 Cleaned up initial audio sync code, and reformatted
