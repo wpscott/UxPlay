@@ -668,9 +668,11 @@ tvOS 12.2.1); it seems that the use of "legacy" protocol just requires bit 27 (l
 The "features" code and other settings are set in `UxPlay/lib/dnssdint.h`.
 
 # ChangeLog
-1.53 2022-06-22   Add support for "Cover Art" display in Audio-only (ALAC) mode. Reverted a change 
-                  that caused  VAAPI to crash with AMD POLARIS graphics cards.
-                  Internal changes to plist and  audio sync code, revised documentation, 
+1.54 2022-06-25   Add support for "Cover Art" display in Audio-only (ALAC) mode. Reverted a change 
+                  that caused  VAAPI to crash with AMD POLARIS graphics cards.   Minor internal changes to
+                  plist code and uxplay option parsing.
+
+1.53 2022-06-13   Internal changes to audio sync code, revised documentation, 
                   Minor bugfix (fix assertion crash when resent audio packets are empty).
 
 1.52 2022-05-05   Cleaned up initial audio sync code, and reformatted

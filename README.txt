@@ -804,9 +804,12 @@ code and other settings are set in `UxPlay/lib/dnssdint.h`.
 
 # ChangeLog
 
-1.53 2022-06-22 Add support for "Cover Art" display in Audio-only (ALAC)
+1.54 2022-06-25 Add support for "Cover Art" display in Audio-only (ALAC)
 mode. Reverted a change that caused VAAPI to crash with AMD POLARIS
-graphics cards. Internal changes to plist and audio sync code, revised
+graphics cards. Minor internal changes to plist code and uxplay option
+parsing.
+
+1.53 2022-06-13 Internal changes to audio sync code, revised
 documentation, Minor bugfix (fix assertion crash when resent audio
 packets are empty).
 
