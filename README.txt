@@ -777,13 +777,13 @@ will be taken over by a new client connection when it is made.
 
 ### 6. Protocol issues, such as failure to decrypt ALL video and audio streams from old or non-Apple clients:
 
-This triggers an unending stream of error messages, and means that the
-audio decryption key (also used in video decryption) was not correctly
-extracted from data sent by the client. This should not happen for iOS
-9.3 or later clients. However, if a client uses the same older version
-of the protocol that is used by the Windows-based AirPlay client
-emulator *AirMyPC*, the protocol can be switched to the older version by
-the setting `OLD_PROTOCOL_CLIENT_USER_AGENT_LIST` in
+A protocol failure may trigger an unending stream of error messages, and
+means that the audio decryption key (also used in video decryption) was
+not correctly extracted from data sent by the client. This should not
+happen for iOS 9.3 or later clients. However, if a client uses the same
+older version of the protocol that is used by the Windows-based AirPlay
+client emulator *AirMyPC*, the protocol can be switched to the older
+version by the setting `OLD_PROTOCOL_CLIENT_USER_AGENT_LIST` in
 `UxPlay/lib/global.h`. UxPlay reports the client's "User Agent" string
 when it connects. If some other client also fails to decrypt all audio
 and video, try adding its "User Agent" string in place of "xxx" in the

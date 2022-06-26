@@ -641,7 +641,7 @@ connection. When the connection is reset, the "frozen" mirror screen of the prev
 
 ### 6. Protocol issues, such as failure to decrypt ALL video and audio streams from old or non-Apple clients:
 
-This triggers an unending stream of error messages, and means that the
+A protocol failure may trigger an unending stream of error messages, and means that the
 audio decryption key (also used in video decryption) 
 was not correctly extracted from data sent by the  client.
 This should not happen for iOS 9.3 or later clients.  However, if a client 
