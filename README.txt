@@ -414,17 +414,6 @@ landscape mode as the device is rotated).
 
 Options:
 
-**-p** allows you to select the network ports used by UxPlay (these need
-to be opened if the server is behind a firewall). By itself, -p sets
-"legacy" ports TCP 7100, 7000, 7001, UDP 6000, 6001, 7011. -p n (e.g. -p
-35000) sets TCP and UDP ports n, n+1, n+2. -p n1,n2,n3 (comma-separated
-values) sets each port separately; -p n1,n2 sets ports n1,n2,n2+1. -p
-tcp n or -p udp n sets just the TCP or UDP ports. Ports must be in the
-range \[1024-65535\].
-
-If the -p option is not used, the ports are chosen dynamically
-(randomly), which will not work if a firewall is running.
-
 **-n server_name** (Default: UxPlay); server_name@\_hostname\_ will be
 the name that appears offering AirPlay services to your iPad, iPhone
 etc, where *hostname* is the name of the server running uxplay. This
@@ -457,41 +446,21 @@ reason to use it.
 **-fs** uses fullscreen mode, but only works with Wayland or VAAPI
 plugins.
 
-**-fps n** sets a maximum frame rate (in frames per second) for the
-AirPlay client to stream video; n must be a whole number less than 256.
-(The client may choose to serve video at any frame rate lower than this;
-default is 30 fps.) A setting below 30 fps might be useful to reduce
-latency if you are running more than one instance of uxplay at the same
-time. *This setting is only an advisory to the client device, so setting
-a high value will not force a high framerate.* (You can test using "-vs
-fpsdisplaysink" to see what framerate is being received, or use the
-option -FPSdata which displays video-stream performance data
-continuously sent by the client during video-streaming.)
+**-p** allows you to select the network ports used by UxPlay (these need
+to be opened if the server is behind a firewall). By itself, -p sets
+"legacy" ports TCP 7100, 7000, 7001, UDP 6000, 6001, 7011. -p n (e.g. -p
+35000) sets TCP and UDP ports n, n+1, n+2. -p n1,n2,n3 (comma-separated
+values) sets each port separately; -p n1,n2 sets ports n1,n2,n2+1. -p
+tcp n or -p udp n sets just the TCP or UDP ports. Ports must be in the
+range \[1024-65535\].
 
-**-FPSdata** Turns on monitoring of regular reports about video
-streaming performance that are sent by the client. These will be
-displayed in the terminal window if this option is used. The data is
-updated by the client at 1 second intervals.
+If the -p option is not used, the ports are chosen dynamically
+(randomly), which will not work if a firewall is running.
 
-**-m** generates a random MAC address to use instead of the true
-hardware MAC number of the computer's network card. (Different
-server_name, MAC addresses, and network ports are needed for each
-running uxplay if you attempt to run two instances of uxplay on the same
-computer.) If UxPlay fails to find the true MAC address of a network
-card, (more specifically, the MAC address used by the first active
-network interface detected) a random MAC address will be used even if
-option **-m** was not specifed. (Note that a random MAC address will be
-different each time UxPlay is started).
-
-Also: image transforms that had been added to RPiPlay have been ported
-to UxPlay:
-
-**-f {H\|V\|I}** implements "videoflip" image transforms: H = horizontal
-flip (right-left flip, or mirror image); V = vertical flip ; I = 180
-degree rotation or inversion (which is the combination of H with V).
-
-**-r {R\|L}** 90 degree Right (clockwise) or Left (counter-clockwise)
-rotations; these are carried out after any **-f** transforms.
+**-avdec** forces use of software h264 decoding using Gstreamer element
+avdec_h264 (libav h264 decoder). This option should prevent
+autovideosink choosing a hardware-accelerated videosink plugin such as
+vaapisink.
 
 **-vp *parser*** choses the GStreamer pipeline's h264 parser element,
 default is h264parse. Using quotes "..." allows options to be added.
@@ -541,11 +510,6 @@ systems using the framebuffer, like RPi OS Bullseye Lite).
 "Desktop" systems using the Wayland video compositor (use for Ubuntu
 21.10 for Raspberry Pi 4B).
 
-**-avdec** forces use of software h264 decoding using Gstreamer element
-avdec_h264 (libav h264 decoder). This option should prevent
-autovideosink choosing a hardware-accelerated videosink plugin such as
-vaapisink.
-
 **-as *audiosink*** chooses the GStreamer audiosink, instead of letting
 autoaudiosink pick it for you. Some audiosink choices are: pulsesink,
 alsasink, osssink, oss4sink, and osxaudiosink (for macOS). Using quotes
@@ -555,12 +519,25 @@ name. (Some choices of audiosink might not work on your system.)
 **-as 0** (or just **-a**) suppresses playing of streamed audio, but
 displays streamed video.
 
-**-reset n** sets a limit of n consective timeout failures of the client
-to respond to ntp requests from the server (these are sent every 3
-seconds to check if the client is still present). After n failures, the
-client will be presumed to be offline, and the connection will be reset
-to allow a new connection. The default value of n is 5; the value n = 0
-means "no limit" on timeouts.
+**-ca *filename*** provides a file (where *filename* can include a full
+path) used for output of "cover art" (from Apple Music, *etc.*,) in
+audio-only ALAC mode. This file is ovewritten with the latest cover art
+as it arrives. Cover art (jpeg format) is discarded if this option is
+not used. Use with a image viewer that reloads the image if it changes,
+or regularly (*e.g.* once per second.). To achieve this, run
+"`uxplay -ca [path/to/]filename &`" in the background, then run the the
+image viewer in the foreground. Example, using `feh` as the viewer: run
+"`feh -R 1 [path/to/]filename`" (in the same terminal window in which
+uxplay was put into the background). To quit, use `ctrl-C fg ctrl-C` to
+terminate the image viewer, bring `uxplay` into the foreground, and
+terminate it too.
+
+**-reset n** sets a limit of n consecutive timeout failures of the
+client to respond to ntp requests from the server (these are sent every
+3 seconds to check if the client is still present). After n failures,
+the client will be presumed to be offline, and the connection will be
+reset to allow a new connection. The default value of n is 5; the value
+n = 0 means "no limit" on timeouts.
 
 **-nc** maintains previous UxPlay \< 1.45 behavior that does **not
 close** the video window when the the client sends the "Stop Mirroring"
@@ -568,6 +545,40 @@ signal. *This option is currently used by default in macOS, as the
 window created in macOS by GStreamer does not terminate correctly (it
 causes a segfault) if it is still open when the GStreamer pipeline is
 closed.*
+
+**-FPSdata** Turns on monitoring of regular reports about video
+streaming performance that are sent by the client. These will be
+displayed in the terminal window if this option is used. The data is
+updated by the client at 1 second intervals.
+
+**-fps n** sets a maximum frame rate (in frames per second) for the
+AirPlay client to stream video; n must be a whole number less than 256.
+(The client may choose to serve video at any frame rate lower than this;
+default is 30 fps.) A setting below 30 fps might be useful to reduce
+latency if you are running more than one instance of uxplay at the same
+time. *This setting is only an advisory to the client device, so setting
+a high value will not force a high framerate.* (You can test using "-vs
+fpsdisplaysink" to see what framerate is being received, or use the
+option -FPSdata which displays video-stream performance data
+continuously sent by the client during video-streaming.)
+
+**-f {H\|V\|I}** implements "videoflip" image transforms: H = horizontal
+flip (right-left flip, or mirror image); V = vertical flip ; I = 180
+degree rotation or inversion (which is the combination of H with V).
+
+**-r {R\|L}** 90 degree Right (clockwise) or Left (counter-clockwise)
+rotations; these image transforms are carried out after any **-f**
+transforms.
+
+**-m** generates a random MAC address to use instead of the true
+hardware MAC number of the computer's network card. (Different
+server_name, MAC addresses, and network ports are needed for each
+running uxplay if you attempt to run two instances of uxplay on the same
+computer.) If UxPlay fails to find the true MAC address of a network
+card, (more specifically, the MAC address used by the first active
+network interface detected) a random MAC address will be used even if
+option **-m** was not specifed. (Note that a random MAC address will be
+different each time UxPlay is started).
 
 **-t *timeout*** will cause the server to relaunch (without stopping
 uxplay) if no connections have been present during the previous
