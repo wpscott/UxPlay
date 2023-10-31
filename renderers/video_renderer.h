@@ -55,7 +55,7 @@ void video_renderer_stop ();
 void video_renderer_pause ();
 void video_renderer_resume ();
 bool video_renderer_is_paused();
-void video_renderer_render_buffer (unsigned char* data, int *data_len, int *nal_count, uint64_t *ntp_time);
+void video_renderer_render_buffer (unsigned char* data, int *data_len, int *nal_count, bool *h264_video, uint64_t *ntp_time);
 void video_renderer_flush ();
 unsigned int video_renderer_listen(void *loop);
 void video_renderer_destroy ();

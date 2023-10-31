@@ -250,7 +250,7 @@ void video_renderer_start() {
 #endif
 }
 
-void video_renderer_render_buffer(unsigned char* data, int *data_len, int *nal_count, uint64_t *ntp_time) {
+void video_renderer_render_buffer(unsigned char* data, int *data_len, int *nal_count, bool *h264_video, uint64_t *ntp_time) {
     GstBuffer *buffer;
     GstClockTime pts = (GstClockTime) *ntp_time; /*now in nsecs */
     //GstClockTimeDiff latency = GST_CLOCK_DIFF(gst_element_get_current_clock_time (renderer->appsrc), pts);

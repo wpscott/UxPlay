@@ -195,7 +195,7 @@ raop_rtp_mirror_thread(void *arg)
     uint64_t ntp_timestamp_local  = 0;
     unsigned char nal_start_code[4] = { 0x00, 0x00, 0x00, 0x01 };
     bool logger_debug = (logger_get_level(raop_rtp_mirror->logger) >= LOGGER_DEBUG);
-    bool h265_video_detected = false;
+    bool h265_video = false;
 
     while (1) {
         fd_set rfds;
@@ -444,22 +444,31 @@ raop_rtp_mirror_thread(void *arg)
                     }
                     int nalu_type = payload_decrypted[nalu_size] & 0x1f;
                     int ref_idc = (payload_decrypted[nalu_size] >> 5);
-                    /* check for unsupported h265 video (sometimes sent by macOS in high-def screen mirroring) */
+                    /* check for h265 video 
+                     * (sent by recent macOS/iPadOS clients in high-def screen mirroring with ethernet connection) */
                     if (payload_decrypted[nalu_size + 1] == 0x01) {
                         switch (payload_decrypted[nalu_size]) {
-                        case 0x28:    // h265 IDR type 20 NAL
                         case 0x02:    // h265 non-IDR type 1 NAL
                             ref_idc = 0;
-                            h265_video_detected = true;
+                            h265_video = true;
+                            nalu_type = 1;
+                            nalu_type += 32;  /* add 32 to h265 nalu type (h264 types are 5 bits, 0-31) */
                             break;
-                        default:
+                        case 0x28:    // h265 IDR type 20 NAL
+                            ref_idc = 0;
+                            h265_video = true;
+                            nalu_type = 20;
+                            nalu_type += 32;
                             break;
-                        }
-                        if (h265_video_detected) {
+                        default:     /* h264 video */
+                            h265_video = false;
                             break;
                         }
                     }
                     switch (nalu_type) {
+                    case 33:   /* 32 + 1  : h265 non-IDR tyoe 1 NAL */
+                    case 52:   /* 32 + 20 : h265 IDR type 20 NAL */
+                        break;
                     case 14:  /* Prefix NALu , seen before all VCL Nalu's in AirMyPc */
                     case 5:   /*IDR, slice_layer_without_partitioning */
                     case 1:   /*non-IDR, slice_layer_without_partitioning */
@@ -508,12 +517,6 @@ raop_rtp_mirror_thread(void *arg)
 		    }
                     nalu_size += nc_len;
                 }
-                if (h265_video_detected) {
-                    logger_log(raop_rtp_mirror->logger, LOGGER_ERR,
-                               "unsupported h265 video detected");
-                    free (payload_out);
-                    break;
-                }
                 if (nalu_size != payload_size) valid_data = false;
                 if(!valid_data) {
                     logger_log(raop_rtp_mirror->logger, LOGGER_DEBUG, "nalu marked as invalid");
@@ -522,6 +525,7 @@ raop_rtp_mirror_thread(void *arg)
 
                 payload_decrypted = NULL;
                 h264_decode_struct h264_data;
+		h264_data.h265_video = h265_video;
                 h264_data.ntp_time_local = ntp_timestamp_local;
                 h264_data.ntp_time_remote = ntp_timestamp_remote;
                 h264_data.nal_count = nalus_count;   /*nal_count will be the number of nal units in the packet */
@@ -542,10 +546,6 @@ raop_rtp_mirror_thread(void *arg)
                 logger_log(raop_rtp_mirror->logger, LOGGER_DEBUG, "\nReceived unencrypted codec packet from client:"
                            " payload_size %d header %s ts_client = %8.6f",
 			   payload_size, packet_description, (double) ntp_timestamp_remote / SEC);
-                if (payload_size == 0) {
-                    logger_log(raop_rtp_mirror->logger, LOGGER_DEBUG, "raop_rtp_mirror, discard type 0x01 packet with no payload");
-                    break;
-                }
                 ntp_timestamp_nal = ntp_timestamp_raw;
                 float width = byteutils_get_float(packet, 16);
                 float height = byteutils_get_float(packet, 20);
@@ -565,7 +565,11 @@ raop_rtp_mirror_thread(void *arg)
                 }
                 logger_log(raop_rtp_mirror->logger, LOGGER_DEBUG, "raop_rtp_mirror width_source = %f height_source = %f width = %f height = %f",
                            width_source, height_source, width, height);
-
+                if (payload_size == 0) {
+                    logger_log(raop_rtp_mirror->logger, LOGGER_DEBUG, "raop_rtp_mirror, received 0x01 packet with no payload (h265 video?)");
+                    raop_rtp_mirror->callbacks.video_pause(raop_rtp_mirror->callbacks.cls);
+                    break;
+                }
                 short sps_size = byteutils_get_short_be(payload,6);
                 unsigned char *sequence_parameter_set = payload + 8;
                 short pps_size = byteutils_get_short_be(payload, sps_size + 9);

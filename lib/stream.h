@@ -23,6 +23,7 @@
 
 typedef struct {
     int nal_count;
+    bool h265_video;
     unsigned char *data;
     int data_len;
     uint64_t ntp_time_local;

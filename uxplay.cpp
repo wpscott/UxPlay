@@ -1212,7 +1212,7 @@ extern "C" void video_process (void *cls, raop_ntp_t *ntp, h264_decode_struct *d
             remote_clock_offset = data->ntp_time_local - data->ntp_time_remote;
         }
         data->ntp_time_remote = data->ntp_time_remote + remote_clock_offset;
-        video_renderer_render_buffer(data->data, &(data->data_len), &(data->nal_count), &(data->ntp_time_remote));
+        video_renderer_render_buffer(data->data, &(data->data_len), &(data->nal_count), &(data->h265_video), &(data->ntp_time_remote));
     }
 }
 
