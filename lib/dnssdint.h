@@ -33,7 +33,7 @@
 #define FEATURES_1 "0x527FFFF7" /* first 32 bits of features, with bit 27 ("supports legacy pairing") OFF */
 #define FEATURES_2  "0x0"        /* second 32 bits of features */
 #define RAOP_RHD "5.6.0.0"
-#define RAOP_SF "0x4"
+#define RAOP_SF "0x04"
 #define RAOP_SV "false"
 #define RAOP_DA "true"
 #define RAOP_SR "44100"         /* Sample rate: 44100 */
@@ -44,7 +44,7 @@
 #define RAOP_VN "65537"
 
 #define AIRPLAY_SRCVERS GLOBAL_VERSION /*defined in global.h */
-#define AIRPLAY_FLAGS "0x4"
+#define AIRPLAY_FLAGS "0x04"
 #define AIRPLAY_VV "2"
 //#define AIRPLAY_PI "2e388006-13ba-4041-9a67-25dd4a43d536"
 #define AIRPLAY_PI "b08f5a79-db29-4384-b456-a4784d9e6055"
