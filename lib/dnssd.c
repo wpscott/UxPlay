@@ -353,7 +353,7 @@ dnssd_register_airplay(dnssd_t *dnssd, unsigned short port)
 
     assert(dnssd);
 
-    snprintf(features, sizeof(features), "0x%X,0x%X", dnssd->features1, dnssd->features2);
+    snprintf(features, sizeof(features), "0x%X", dnssd->features1);
 
     /* Convert hardware address to string */
     if (utils_hwaddr_airplay(device_id, sizeof(device_id), dnssd->hw_addr, dnssd->hw_addr_len) < 0) {
