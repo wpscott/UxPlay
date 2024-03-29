@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
 
 #include "raop.h"
 #include "raop_rtp.h"
@@ -226,9 +227,15 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
 
     *response = http_response_init("RTSP/1.0", 200, "OK");
 
+    if (!strcmp(method, "RECORD")) {
+        http_response_add_header(*response, "Audio-Latency", "0");
+    } else {
+        http_response_add_header(*response, "Audio-Jack-Status", "Connected; type=digital");
+    }
     http_response_add_header(*response, "CSeq", cseq);
-    //http_response_add_header(*response, "Apple-Jack-Status", "connected; type=analog");
+    http_response_add_header(*response, "Date", gmt_time_string());
     http_response_add_header(*response, "Server", "AirTunes/"GLOBAL_VERSION);
+    http_response_add_header(*response, "Session", "CAFEBABE");
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "Handling request %s with URL %s", method, url);
     raop_handler_t handler = NULL;
@@ -575,4 +582,15 @@ void
 raop_stop(raop_t *raop) {
     assert(raop);
     httpd_stop(raop->httpd);
+}
+
+const char *gmt_time_string() {
+  static char date_buf[64];
+  memset(date_buf, 0, 64);
+
+  time_t now = time(0);
+  if (strftime(date_buf, 64, "%c GMT", gmtime(&now))) {
+    return date_buf;
+  }else
+    return 0;
 }

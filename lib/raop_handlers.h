@@ -45,6 +45,10 @@ raop_handler_info(raop_conn_t *conn,
     int hw_addr_raw_len = 0;
     const char *hw_addr_raw = dnssd_get_hw_addr(conn->raop->dnssd, &hw_addr_raw_len);
 
+    char *device_id = calloc(1, 3 * hw_addr_raw_len);
+    utils_hwaddr_airplay(device_id, 3 * hw_addr_raw_len, hw_addr_raw, hw_addr_raw_len);
+    str_replace(device_id, ":", "");
+
     char *hw_addr = calloc(1, 3 * hw_addr_raw_len);
     //int hw_addr_len =
     utils_hwaddr_airplay(hw_addr, 3 * hw_addr_raw_len, hw_addr_raw, hw_addr_raw_len);
@@ -54,71 +58,79 @@ raop_handler_info(raop_conn_t *conn,
 
     plist_t r_node = plist_new_dict();
 
-    plist_t txt_airplay_node = plist_new_data(airplay_txt, airplay_txt_len);
-    plist_dict_set_item(r_node, "txtAirPlay", txt_airplay_node);
+    /*plist_t txt_airplay_node = plist_new_data(airplay_txt, airplay_txt_len);
+    plist_dict_set_item(r_node, "txtAirPlay", txt_airplay_node);*/
+
+    //plist_t device_id_node = plist_new_string(device_id);
+    plist_t device_id_node = plist_new_string("AABBCCDDEEFF");
+    plist_dict_set_item(r_node, "deviceID", device_id_node);
 
     uint64_t features = dnssd_get_airplay_features(conn->raop->dnssd);
     plist_t features_node = plist_new_uint(features);
     plist_dict_set_item(r_node, "features", features_node);
 
+    plist_t keep_alive_low_power_node = plist_new_uint(1);
+    plist_dict_set_item(r_node, "keepAliveLowPower", keep_alive_low_power_node);
+
+    plist_t keep_alive_send_stats_as_body_node = plist_new_uint(1);
+    plist_dict_set_item(r_node, "keepAliveSendStatsAsBody", keep_alive_send_stats_as_body_node);
+
+    //plist_t mac_address_node = plist_new_string(hw_addr);
+    plist_t mac_address_node = plist_new_string("AA:BB:CC:DD:EE:FF");
+    plist_dict_set_item(r_node, "macAddress", mac_address_node);
+
+    plist_t model_node = plist_new_string(GLOBAL_MODEL);
+    plist_dict_set_item(r_node, "model", model_node);
+    
     plist_t name_node = plist_new_string(name);
     plist_dict_set_item(r_node, "name", name_node);
 
+    plist_t source_version_node = plist_new_string(GLOBAL_VERSION);
+    plist_dict_set_item(r_node, "sourceVersion", source_version_node);
+
+    plist_t status_flags_node = plist_new_uint(68);
+    plist_dict_set_item(r_node, "statusFlags", status_flags_node);
+
+    plist_t pi_node = plist_new_string(AIRPLAY_PI);
+    plist_dict_set_item(r_node, "pi", pi_node);
+
+    plist_t pk_node = plist_new_data(pk, pk_len);
+    plist_dict_set_item(r_node, "pk", pk_node);
+
+    plist_t vv_node = plist_new_uint(strtol(AIRPLAY_VV, NULL, 10));
+    plist_dict_set_item(r_node, "vv", vv_node);
+
     plist_t audio_formats_node = plist_new_array();
     plist_t audio_format_0_node = plist_new_dict();
-    plist_t audio_format_0_type_node = plist_new_uint(100);
-    plist_t audio_format_0_audio_input_formats_node = plist_new_uint(0x3fffffc);
-    plist_t audio_format_0_audio_output_formats_node = plist_new_uint(0x3fffffc);
+    plist_t audio_format_0_type_node = plist_new_uint(96);
+    plist_t audio_format_0_audio_input_formats_node = plist_new_uint(0x01000000);
+    plist_t audio_format_0_audio_output_formats_node = plist_new_uint(0x01000000);
     plist_dict_set_item(audio_format_0_node, "type", audio_format_0_type_node);
     plist_dict_set_item(audio_format_0_node, "audioInputFormats", audio_format_0_audio_input_formats_node);
     plist_dict_set_item(audio_format_0_node, "audioOutputFormats", audio_format_0_audio_output_formats_node);
     plist_array_append_item(audio_formats_node, audio_format_0_node);
-    plist_t audio_format_1_node = plist_new_dict();
+    /*plist_t audio_format_1_node = plist_new_dict();
     plist_t audio_format_1_type_node = plist_new_uint(101);
     plist_t audio_format_1_audio_input_formats_node = plist_new_uint(0x3fffffc);
     plist_t audio_format_1_audio_output_formats_node = plist_new_uint(0x3fffffc);
     plist_dict_set_item(audio_format_1_node, "type", audio_format_1_type_node);
     plist_dict_set_item(audio_format_1_node, "audioInputFormats", audio_format_1_audio_input_formats_node);
     plist_dict_set_item(audio_format_1_node, "audioOutputFormats", audio_format_1_audio_output_formats_node);
-    plist_array_append_item(audio_formats_node, audio_format_1_node);
+    plist_array_append_item(audio_formats_node, audio_format_1_node);*/
     plist_dict_set_item(r_node, "audioFormats", audio_formats_node);
-
-    plist_t pi_node = plist_new_string(AIRPLAY_PI);
-    plist_dict_set_item(r_node, "pi", pi_node);
-
-    plist_t vv_node = plist_new_uint(strtol(AIRPLAY_VV, NULL, 10));
-    plist_dict_set_item(r_node, "vv", vv_node);
-
-    plist_t status_flags_node = plist_new_uint(68);
-    plist_dict_set_item(r_node, "statusFlags", status_flags_node);
-
-    plist_t keep_alive_low_power_node = plist_new_uint(1);
-    plist_dict_set_item(r_node, "keepAliveLowPower", keep_alive_low_power_node);
-
-    plist_t source_version_node = plist_new_string(GLOBAL_VERSION);
-    plist_dict_set_item(r_node, "sourceVersion", source_version_node);
-
-    plist_t pk_node = plist_new_data(pk, pk_len);
-    plist_dict_set_item(r_node, "pk", pk_node);
-
-    plist_t keep_alive_send_stats_as_body_node = plist_new_uint(1);
-    plist_dict_set_item(r_node, "keepAliveSendStatsAsBody", keep_alive_send_stats_as_body_node);
-
-    plist_t device_id_node = plist_new_string(hw_addr);
-    plist_dict_set_item(r_node, "deviceID", device_id_node);
 
     plist_t audio_latencies_node = plist_new_array();
     plist_t audio_latencies_0_node = plist_new_dict();
-    plist_t audio_latencies_0_output_latency_micros_node = plist_new_bool(0);
-    plist_t audio_latencies_0_type_node = plist_new_uint(100);
+    plist_t audio_latencies_0_output_latency_micros_node = plist_new_uint(0);
+    plist_t audio_latencies_0_type_node = plist_new_uint(96);
     plist_t audio_latencies_0_audio_type_node = plist_new_string("default");
-    plist_t audio_latencies_0_input_latency_micros_node = plist_new_bool(0);
-    plist_dict_set_item(audio_latencies_0_node, "outputLatencyMicros", audio_latencies_0_output_latency_micros_node);
+    plist_t audio_latencies_0_input_latency_micros_node = plist_new_uint(0);
     plist_dict_set_item(audio_latencies_0_node, "type", audio_latencies_0_type_node);
     plist_dict_set_item(audio_latencies_0_node, "audioType", audio_latencies_0_audio_type_node);
     plist_dict_set_item(audio_latencies_0_node, "inputLatencyMicros", audio_latencies_0_input_latency_micros_node);
+    plist_dict_set_item(audio_latencies_0_node, "outputLatencyMicros", audio_latencies_0_output_latency_micros_node);
     plist_array_append_item(audio_latencies_node, audio_latencies_0_node);
-    plist_t audio_latencies_1_node = plist_new_dict();
+    /*plist_t audio_latencies_1_node = plist_new_dict();
     plist_t audio_latencies_1_output_latency_micros_node = plist_new_bool(0);
     plist_t audio_latencies_1_type_node = plist_new_uint(101);
     plist_t audio_latencies_1_audio_type_node = plist_new_string("default");
@@ -127,42 +139,39 @@ raop_handler_info(raop_conn_t *conn,
     plist_dict_set_item(audio_latencies_1_node, "type", audio_latencies_1_type_node);
     plist_dict_set_item(audio_latencies_1_node, "audioType", audio_latencies_1_audio_type_node);
     plist_dict_set_item(audio_latencies_1_node, "inputLatencyMicros", audio_latencies_1_input_latency_micros_node);
-    plist_array_append_item(audio_latencies_node, audio_latencies_1_node);
+    plist_array_append_item(audio_latencies_node, audio_latencies_1_node);*/
     plist_dict_set_item(r_node, "audioLatencies", audio_latencies_node);
-
-    plist_t model_node = plist_new_string(GLOBAL_MODEL);
-    plist_dict_set_item(r_node, "model", model_node);
-
-    plist_t mac_address_node = plist_new_string(hw_addr);
-    plist_dict_set_item(r_node, "macAddress", mac_address_node);
 
     plist_t displays_node = plist_new_array();
     plist_t displays_0_node = plist_new_dict();
-    plist_t displays_0_uuid_node = plist_new_string("e0ff8a27-6738-3d56-8a16-cc53aacee925");
-    plist_t displays_0_width_physical_node = plist_new_bool(0);
-    plist_t displays_0_height_physical_node = plist_new_bool(0);
+    plist_t displays_0_uuid_node = plist_new_string("e5f7a68d-7b0f-4305-984b-974f677a150b");
+    plist_t displays_0_width_physical_node = plist_new_uint(0);
+    plist_t displays_0_height_physical_node = plist_new_uint(0);
     plist_t displays_0_width_node = plist_new_uint(conn->raop->width);
     plist_t displays_0_height_node = plist_new_uint(conn->raop->height);
     plist_t displays_0_width_pixels_node = plist_new_uint(conn->raop->width);
     plist_t displays_0_height_pixels_node = plist_new_uint(conn->raop->height);
-    plist_t displays_0_rotation_node = plist_new_bool(0);
+    plist_t displays_0_rotation_node = plist_new_bool(1);
     plist_t displays_0_refresh_rate_node = plist_new_uint(conn->raop->refreshRate);
     plist_t displays_0_max_fps_node = plist_new_uint(conn->raop->maxFPS);
     plist_t displays_0_overscanned_node = plist_new_bool(conn->raop->overscanned);
     plist_t displays_0_features = plist_new_uint(14);
 
-    plist_dict_set_item(displays_0_node, "uuid", displays_0_uuid_node);
-    plist_dict_set_item(displays_0_node, "widthPhysical", displays_0_width_physical_node);
+    plist_dict_set_item(displays_0_node, "features", displays_0_features);
+    plist_dict_set_item(displays_0_node, "height", displays_0_height_node);
+    plist_dict_set_item(displays_0_node, "heightPixels", displays_0_height_pixels_node);
     plist_dict_set_item(displays_0_node, "heightPhysical", displays_0_height_physical_node);
     plist_dict_set_item(displays_0_node, "width", displays_0_width_node);
-    plist_dict_set_item(displays_0_node, "height", displays_0_height_node);
     plist_dict_set_item(displays_0_node, "widthPixels", displays_0_width_pixels_node);
-    plist_dict_set_item(displays_0_node, "heightPixels", displays_0_height_pixels_node);
-    plist_dict_set_item(displays_0_node, "rotation", displays_0_rotation_node);
+    plist_dict_set_item(displays_0_node, "widthPhysical", displays_0_width_physical_node);
     plist_dict_set_item(displays_0_node, "refreshRate", displays_0_refresh_rate_node);
-    plist_dict_set_item(displays_0_node, "maxFPS", displays_0_max_fps_node);
     plist_dict_set_item(displays_0_node, "overscanned", displays_0_overscanned_node);
-    plist_dict_set_item(displays_0_node, "features", displays_0_features);
+    plist_dict_set_item(displays_0_node, "rotation", displays_0_rotation_node);
+    plist_dict_set_item(displays_0_node, "uuid", displays_0_uuid_node);
+    
+    //plist_dict_set_item(displays_0_node, "maxFPS", displays_0_max_fps_node);
+    
+    
     plist_array_append_item(displays_node, displays_0_node);
     plist_dict_set_item(r_node, "displays", displays_node);
 
@@ -761,10 +770,11 @@ raop_handler_setup(raop_conn_t *conn,
                                                          conn->raop_ntp, remote, conn->remotelen, aeskey);
         }
 
-        plist_t res_event_port_node = plist_new_uint(conn->raop->port);
+        plist_t res_event_port_node = plist_new_uint(0);
         plist_t res_timing_port_node = plist_new_uint(timing_lport);
-        plist_dict_set_item(res_root_node, "timingPort", res_timing_port_node);
         plist_dict_set_item(res_root_node, "eventPort", res_event_port_node);
+        plist_dict_set_item(res_root_node, "timingPort", res_timing_port_node);
+        
 
         logger_log(conn->raop->logger, LOGGER_DEBUG, "eport = %d, tport = %d", conn->raop->port, timing_lport);
     }
@@ -914,7 +924,7 @@ raop_handler_get_parameter(raop_conn_t *conn,
 
             /* This is a bit ugly, but seems to be how airport works too */
             if ((datalen - (current - data) >= 8) && !strncmp(current, "volume\r\n", 8)) {
-                const char volume[] = "volume: 0.0\r\n";
+                const char volume[] = "volume: 0.000000\r\n";
 
                 http_response_add_header(response, "Content-Type", "text/parameters");
                 *response_data = strdup(volume);
@@ -993,6 +1003,7 @@ raop_handler_feedback(raop_conn_t *conn,
                       http_request_t *request, http_response_t *response,
                       char **response_data, int *response_datalen)
 {
+    //http_response_add_header(response, "Audio-Latency", "0");
     logger_log(conn->raop->logger, LOGGER_DEBUG, "raop_handler_feedback");
 }
 
@@ -1005,8 +1016,11 @@ raop_handler_record(raop_conn_t *conn,
     unsigned int ad = (unsigned int) (((uint64_t) conn->raop->audio_delay_micros) * AUDIO_SAMPLE_RATE / SECOND_IN_USECS);
     snprintf(audio_latency, sizeof(audio_latency), "%u", ad);
     logger_log(conn->raop->logger, LOGGER_DEBUG, "raop_handler_record");
-    http_response_add_header(response, "Audio-Latency", audio_latency);
-    http_response_add_header(response, "Audio-Jack-Status", "connected; type=analog");
+    raop_ntp_cast_start(conn->raop_ntp);
+    //unsigned short timing_lport = conn->raop->timing_lport;
+    //raop_ntp_start(conn->raop_ntp, &timing_lport, conn->raop->max_ntp_timeouts);
+    //http_response_add_header(response, "Audio-Latency", audio_latency);
+    //http_response_add_header(response, "Audio-Jack-Status", "connected; type=digital");
 }
 
 static void

@@ -1331,7 +1331,7 @@ static int start_dnssd(std::vector<char> hw_addr, std::string name) {
         return 1;
     }
     /* bit 27 of Features determines whether the AirPlay2 client-pairing protocol will be used (1) or not (0) */
-    dnssd_set_airplay_features(dnssd, 27, (int) setup_legacy_pairing);
+    //dnssd_set_airplay_features(dnssd, 27, (int) setup_legacy_pairing);
     return 0;
 }
 
@@ -1759,13 +1759,7 @@ static int start_raop_server (unsigned short display[5], unsigned short tcp[3], 
     raop_start(raop, &raop_port);
     raop_set_port(raop, raop_port);
 
-    if (tcp[2]) {
-        airplay_port = tcp[2];
-    } else {
-        /* is there a problem if this coincides with a randomly-selected tcp raop_mirror_data port? 
-         * probably not, as the airplay port is only used for initial client contact */
-        airplay_port = (raop_port != HIGHEST_PORT ? raop_port + 1 : raop_port - 1);
-    }
+    airplay_port = raop_port;
     if (dnssd) {
         raop_set_dnssd(raop, dnssd);
     } else {

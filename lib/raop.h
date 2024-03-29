@@ -83,6 +83,7 @@ RAOP_API int raop_is_running(raop_t *raop);
 RAOP_API void raop_stop(raop_t *raop);
 RAOP_API void raop_set_dnssd(raop_t *raop, dnssd_t *dnssd);
 RAOP_API void raop_destroy(raop_t *raop);
+const char *gmt_time_string();
 
 #ifdef __cplusplus
 }
