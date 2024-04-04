@@ -22,7 +22,7 @@
 
 /* the previous behavior of announcing UxPlay with a fixed public key PK
  * can be restored by uncommenting the following line  */
-#define PK "99FD4299889422515FBD27949E4E1E21B2AF50A454499E3D4BE75A4E0F55FE63"
+//#define PK "99FD4299889422515FBD27949E4E1E21B2AF50A454499E3D4BE75A4E0F55FE63"
 
 #define RAOP_TXTVERS "1"
 #define RAOP_CH "2"             /* Audio channels: 2 */

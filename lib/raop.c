@@ -188,7 +188,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
 
-    if (!method || !cseq) {
+    if (!method) {
         return;
     }
     logger_log(conn->raop->logger, LOGGER_DEBUG, "\n%s %s RTSP/1.0", method, url);
@@ -232,7 +232,9 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     } else {
         http_response_add_header(*response, "Audio-Jack-Status", "Connected; type=digital");
     }
-    http_response_add_header(*response, "CSeq", cseq);
+    if (cseq) {
+        http_response_add_header(*response, "CSeq", cseq);
+    }
     http_response_add_header(*response, "Date", gmt_time_string());
     http_response_add_header(*response, "Server", "AirTunes/"GLOBAL_VERSION);
     http_response_add_header(*response, "Session", "CAFEBABE");

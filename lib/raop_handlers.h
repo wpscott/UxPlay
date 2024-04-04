@@ -61,8 +61,8 @@ raop_handler_info(raop_conn_t *conn,
     /*plist_t txt_airplay_node = plist_new_data(airplay_txt, airplay_txt_len);
     plist_dict_set_item(r_node, "txtAirPlay", txt_airplay_node);*/
 
-    //plist_t device_id_node = plist_new_string(device_id);
-    plist_t device_id_node = plist_new_string("AABBCCDDEEFF");
+    plist_t device_id_node = plist_new_string(device_id);
+    //plist_t device_id_node = plist_new_string("AABBCCDDEEFF");
     plist_dict_set_item(r_node, "deviceID", device_id_node);
 
     uint64_t features = dnssd_get_airplay_features(conn->raop->dnssd);
@@ -75,8 +75,8 @@ raop_handler_info(raop_conn_t *conn,
     plist_t keep_alive_send_stats_as_body_node = plist_new_uint(1);
     plist_dict_set_item(r_node, "keepAliveSendStatsAsBody", keep_alive_send_stats_as_body_node);
 
-    //plist_t mac_address_node = plist_new_string(hw_addr);
-    plist_t mac_address_node = plist_new_string("AA:BB:CC:DD:EE:FF");
+    plist_t mac_address_node = plist_new_string(hw_addr);
+    //plist_t mac_address_node = plist_new_string("AA:BB:CC:DD:EE:FF");
     plist_dict_set_item(r_node, "macAddress", mac_address_node);
 
     plist_t model_node = plist_new_string(GLOBAL_MODEL);
