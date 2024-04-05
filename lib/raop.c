@@ -225,7 +225,11 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
 
-    *response = http_response_init("RTSP/1.0", 200, "OK");
+    if (!strcmp(url, "/server-info")) {
+        *response = http_response_init("HTTP/1.1", 200, "OK");  
+    } else {
+        *response = http_response_init("RTSP/1.0", 200, "OK");
+    }
 
     if (!strcmp(method, "RECORD")) {
         http_response_add_header(*response, "Audio-Latency", "0");
@@ -243,6 +247,8 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     raop_handler_t handler = NULL;
     if (!strcmp(method, "GET") && !strcmp(url, "/info")) {
         handler = &raop_handler_info;
+    } else if (!strcmp(method, "GET") && !strcmp(url, "/server-info")) {
+        handler = &raop_handler_server_info;
     } else if (!strcmp(method, "POST") && !strcmp(url, "/pair-pin-start")) {
         handler = &raop_handler_pairpinstart;
     } else if (!strcmp(method, "POST") && !strcmp(url, "/pair-setup-pin")) {

@@ -31,5 +31,19 @@ char *utils_data_to_text(const char *data, int datalen);
 void ntp_timestamp_to_time(uint64_t ntp_timestamp, char *timestamp, size_t maxsize);
 void ntp_timestamp_to_seconds(uint64_t ntp_timestamp, char *timestamp, size_t maxsize);
 void str_replace(char *target, const char *needle, const char *replacement);
+inline void concatenate_string(char* s, char* s1)
+{
+    int i;
+ 
+    int j = strlen(s);
+ 
+    for (i = 0; s1[i] != '\0'; i++) {
+        s[i + j] = s1[i];
+    }
+ 
+    s[i + j] = '\0';
+ 
+    return;
+}
 
 #endif

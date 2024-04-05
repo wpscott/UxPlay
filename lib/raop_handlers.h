@@ -36,8 +36,8 @@ raop_handler_info(raop_conn_t *conn,
 {
     assert(conn->raop->dnssd);
 
-    int airplay_txt_len = 0;
-    const char *airplay_txt = dnssd_get_airplay_txt(conn->raop->dnssd, &airplay_txt_len);
+    //int airplay_txt_len = 0;
+    //const char *airplay_txt = dnssd_get_airplay_txt(conn->raop->dnssd, &airplay_txt_len);
 
     int name_len = 0;
     const char *name = dnssd_get_name(conn->raop->dnssd, &name_len);
@@ -153,7 +153,7 @@ raop_handler_info(raop_conn_t *conn,
     plist_t displays_0_height_pixels_node = plist_new_uint(conn->raop->height);
     plist_t displays_0_rotation_node = plist_new_bool(1);
     plist_t displays_0_refresh_rate_node = plist_new_uint(conn->raop->refreshRate);
-    plist_t displays_0_max_fps_node = plist_new_uint(conn->raop->maxFPS);
+    //plist_t displays_0_max_fps_node = plist_new_uint(conn->raop->maxFPS);
     plist_t displays_0_overscanned_node = plist_new_bool(conn->raop->overscanned);
     plist_t displays_0_features = plist_new_uint(14);
 
@@ -179,6 +179,93 @@ raop_handler_info(raop_conn_t *conn,
     plist_free(r_node);
     http_response_add_header(response, "Content-Type", "application/x-apple-binary-plist");
     free(pk);
+    free(hw_addr);
+}
+
+static void
+raop_handler_server_info(raop_conn_t *conn,
+                        http_request_t *request, http_response_t *response,
+                        char **response_data, int *response_datalen) {
+    int hw_addr_raw_len = 0;
+    const char *hw_addr_raw = dnssd_get_hw_addr(conn->raop->dnssd, &hw_addr_raw_len);
+
+    char *hw_addr = calloc(1, 3 * hw_addr_raw_len);
+    //int hw_addr_len =
+    utils_hwaddr_airplay(hw_addr, 3 * hw_addr_raw_len, hw_addr_raw, hw_addr_raw_len);
+
+    plist_t r_node = plist_new_dict();
+
+    plist_t features_node = plist_new_uint(0x27F);
+    plist_dict_set_item(r_node, "features", features_node);
+
+    plist_t mac_address_node = plist_new_string(hw_addr);
+    //plist_t mac_address_node = plist_new_string("AA:BB:CC:DD:EE:FF");
+    plist_dict_set_item(r_node, "macAddress", mac_address_node);
+
+    plist_t model_node = plist_new_string(GLOBAL_MODEL);
+    plist_dict_set_item(r_node, "model", model_node);
+
+    plist_t os_build_node = plist_new_string("12B435");
+    plist_dict_set_item(r_node, "osBuildVersion", os_build_node);
+
+    plist_t protovers_node = plist_new_string("1.0");
+    plist_dict_set_item(r_node, "protovers", protovers_node);
+
+    plist_t source_version_node = plist_new_string(GLOBAL_VERSION);
+    plist_dict_set_item(r_node, "srcvers", source_version_node);
+
+    plist_t vv_node = plist_new_uint(strtol(AIRPLAY_VV, NULL, 10));
+    plist_dict_set_item(r_node, "vv", vv_node);
+
+    plist_t device_id_node = plist_new_string(hw_addr);
+    //plist_t device_id_node = plist_new_string("AABBCCDDEEFF");
+    plist_dict_set_item(r_node, "deviceid", device_id_node);
+
+    plist_to_xml(r_node, response_data, (uint32_t *) response_datalen);
+    printf("%s", *response_data);
+    plist_free(r_node);
+
+    /*char serverinfo_plist[2048];
+
+    concatenate_string(serverinfo_plist, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    concatenate_string(serverinfo_plist, "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n");
+    concatenate_string(serverinfo_plist, "<plist version=\"1.0\">\n");
+    concatenate_string(serverinfo_plist, "<dict>\n");
+    concatenate_string(serverinfo_plist, "\t<key>features</key>\n");
+    concatenate_string(serverinfo_plist, "\t<integer>0x27F</integer>\n");
+    concatenate_string(serverinfo_plist, "\t<key>macAddress</key>\n");
+    concatenate_string(serverinfo_plist, "\t<string>");
+    concatenate_string(serverinfo_plist, hw_addr);
+    concatenate_string(serverinfo_plist, "</string>\n");
+    concatenate_string(serverinfo_plist, "\t<key>model</key>\n");
+    concatenate_string(serverinfo_plist, "\t<string>");
+    concatenate_string(serverinfo_plist, GLOBAL_MODEL);
+    concatenate_string(serverinfo_plist, "</string>\n");
+    concatenate_string(serverinfo_plist, "\t<key>osBuildVersion</key>\n");
+    concatenate_string(serverinfo_plist, "\t<string>12B435</string>\n");
+    concatenate_string(serverinfo_plist, "\t<key>protovers</key>\n");
+    concatenate_string(serverinfo_plist, "\t<string>1.0</string>\n");
+    concatenate_string(serverinfo_plist, "\t<key>srcvers</key>\n");
+    concatenate_string(serverinfo_plist, "\t<string>");
+    concatenate_string(serverinfo_plist, GLOBAL_VERSION);
+    concatenate_string(serverinfo_plist, "</string>\n");
+    concatenate_string(serverinfo_plist, "\t<key>vv</key>\n");
+    concatenate_string(serverinfo_plist, "\t<integer>");
+    concatenate_string(serverinfo_plist, device_id);
+    concatenate_string(serverinfo_plist, "</integer>\n");
+    concatenate_string(serverinfo_plist, "\t<key>deviceid</key>\n");
+    concatenate_string(serverinfo_plist, "\t<string>");
+    concatenate_string(serverinfo_plist, device_id);
+    concatenate_string(serverinfo_plist, "</string>\n");
+    concatenate_string(serverinfo_plist, "</dict>\n");
+    concatenate_string(serverinfo_plist, "</plist>");
+
+    response_data = (strlen(serverinfo_plist) + 1);
+    printf("Survived");
+    strcpy(response_data, serverinfo_plist);
+    *response_datalen = 575;*/
+
+    http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
     free(hw_addr);
 }
 
