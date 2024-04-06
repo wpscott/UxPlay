@@ -275,6 +275,8 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         handler = &raop_handler_flush;
     } else if (!strcmp(method, "TEARDOWN")) {
         handler = &raop_handler_teardown;
+    } else if (!strcmp(url, "/reverse")) {
+        logger_log(conn->raop->logger, LOGGER_DEBUG, "REVERSE TIME");
     } else {
         logger_log(conn->raop->logger, LOGGER_INFO, "Unhandled Client Request: %s %s", method, url);
     }

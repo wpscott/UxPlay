@@ -222,6 +222,9 @@ raop_handler_server_info(raop_conn_t *conn,
     plist_dict_set_item(r_node, "deviceid", device_id_node);
 
     plist_to_xml(r_node, response_data, (uint32_t *) response_datalen);
+    int lastbyte = *response_datalen - 1;
+    response_data[lastbyte] = 0x0;
+    *response_datalen = *response_datalen - 1; //TODO: Check if this does anything
     printf("%s", *response_data);
     plist_free(r_node);
 
