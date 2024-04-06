@@ -89,6 +89,9 @@ struct raop_conn_s {
     unsigned char *remote;
     int remotelen;
 
+    const char *cast_session;
+    int castsessionlen;
+
     bool have_active_remote;
 };
 typedef struct raop_conn_s raop_conn_t;
@@ -237,6 +240,11 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         http_response_add_header(*response, "Audio-Latency", "0");
     } else {
         http_response_add_header(*response, "Audio-Jack-Status", "Connected; type=digital");
+    }
+    if (!strcmp(url, "/reverse")) {
+        const char *reverseconn;
+        reverseconn = http_request_get_header(request, "Connection");
+        http_response_add_header(*response, "Connection", reverseconn);
     }
     if (cseq) {
         http_response_add_header(*response, "CSeq", cseq);

@@ -1093,12 +1093,12 @@ raop_handler_reverse(raop_conn_t *conn,
                       char **response_data, int *response_datalen)
 {
     logger_log(conn->raop->logger, LOGGER_DEBUG, "raop_handler_reverse");
-    const char* connection;
     const char* upgrade;
-    connection = http_request_get_header(request, "Connection");
+    conn->cast_session = http_request_get_header(request, "X-Apple-Session-ID");
+    conn->castsessionlen = strlen(conn->cast_session);
     upgrade = http_request_get_header(request, "Upgrade");
-    http_response_add_header(response, "Connection", connection);
     http_response_add_header(response, "Upgrade", upgrade);
+    http_response_add_header(response, "Content-Length", "0");
 }
 
 static void
