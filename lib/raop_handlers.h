@@ -1087,6 +1087,19 @@ raop_handler_set_parameter(raop_conn_t *conn,
     }
 }
 
+static void
+raop_handler_reverse(raop_conn_t *conn,
+                      http_request_t *request, http_response_t *response,
+                      char **response_data, int *response_datalen)
+{
+    logger_log(conn->raop->logger, LOGGER_DEBUG, "raop_handler_reverse");
+    const char* connection;
+    const char* upgrade;
+    connection = http_request_get_header(request, "Connection");
+    upgrade = http_request_get_header(request, "Upgrade");
+    http_response_add_header(response, "Connection", connection);
+    http_response_add_header(response, "Upgrade", upgrade);
+}
 
 static void
 raop_handler_feedback(raop_conn_t *conn,

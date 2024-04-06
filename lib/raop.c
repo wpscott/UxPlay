@@ -227,6 +227,8 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
 
     if (!strcmp(url, "/server-info")) {
         *response = http_response_init("HTTP/1.1", 200, "OK");  
+    } else if (!strcmp(url, "/reverse")) {
+        *response = http_response_init("HTTP/1.1", 101, "Switching Protocols");
     } else {
         *response = http_response_init("RTSP/1.0", 200, "OK");
     }
@@ -275,8 +277,8 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         handler = &raop_handler_flush;
     } else if (!strcmp(method, "TEARDOWN")) {
         handler = &raop_handler_teardown;
-    } else if (!strcmp(url, "/reverse")) {
-        logger_log(conn->raop->logger, LOGGER_DEBUG, "REVERSE TIME");
+    } else if (!strcmp(method, "POST") && !strcmp(url, "/reverse")) {
+        handler = &raop_handler_reverse;
     } else {
         logger_log(conn->raop->logger, LOGGER_INFO, "Unhandled Client Request: %s %s", method, url);
     }
