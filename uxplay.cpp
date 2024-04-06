@@ -121,7 +121,7 @@ static unsigned short display[5] = {0}, tcp[3] = {0}, udp[3] = {0};
 static bool debug_log = DEFAULT_DEBUG_LOG;
 static int log_level = LOGGER_INFO;
 static bool bt709_fix = false;
-static int max_connections = 2;
+static int max_connections = 3;
 static unsigned short raop_port;
 static unsigned short airplay_port;
 static uint64_t remote_clock_offset = 0;
