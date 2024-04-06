@@ -183,7 +183,7 @@ raop_handler_info(raop_conn_t *conn,
 }
 
 static void
-raop_handler_server_info(raop_conn_t *conn,
+http_handler_server_info(raop_conn_t *conn,
                         http_request_t *request, http_response_t *response,
                         char **response_data, int *response_datalen) {
     int hw_addr_raw_len = 0;
@@ -1088,17 +1088,72 @@ raop_handler_set_parameter(raop_conn_t *conn,
 }
 
 static void
-raop_handler_reverse(raop_conn_t *conn,
+http_handler_reverse(raop_conn_t *conn,
                       http_request_t *request, http_response_t *response,
                       char **response_data, int *response_datalen)
 {
-    logger_log(conn->raop->logger, LOGGER_DEBUG, "raop_handler_reverse");
+    logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_reverse");
     const char* upgrade;
     conn->cast_session = http_request_get_header(request, "X-Apple-Session-ID");
     conn->castsessionlen = strlen(conn->cast_session);
     upgrade = http_request_get_header(request, "Upgrade");
     http_response_add_header(response, "Upgrade", upgrade);
     http_response_add_header(response, "Content-Length", "0");
+}
+
+static void
+http_handler_playback_info(raop_conn_t *conn,
+                      http_request_t *request, http_response_t *response,
+                      char **response_data, int *response_datalen)
+{
+    logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_playback_info");
+
+    plist_t r_node = plist_new_dict();
+
+    plist_t duration = plist_new_real(300);
+    plist_dict_set_item(r_node, "duration", duration);
+
+    plist_t position = plist_new_real(0);
+    plist_dict_set_item(r_node, "position", position);
+
+    plist_t rate = plist_new_real(1);
+    plist_dict_set_item(r_node, "rate", rate);
+
+    plist_t readyToPlay = plist_new_uint(1);
+    plist_dict_set_item(r_node, "readyToPlay", readyToPlay);
+
+    plist_t playbackBufferEmpty = plist_new_uint(1);
+    plist_dict_set_item(r_node, "playbackBufferEmpty", playbackBufferEmpty);
+
+    plist_t playbackBufferFull = plist_new_uint(0);
+    plist_dict_set_item(r_node, "playbackBufferFull", playbackBufferFull);
+
+    plist_t playbackLikelyToKeepUp = plist_new_uint(1);
+    plist_dict_set_item(r_node, "playbackLikelyToKeepUp", playbackLikelyToKeepUp);
+
+    plist_t loadedTimeRanges = plist_new_array();
+    plist_t loadedTimeRanges0 = plist_new_dict();
+    plist_t durationLoad = plist_new_real(300);
+    plist_dict_set_item(loadedTimeRanges0, "duration", durationLoad);
+    plist_t start = plist_new_real(0.0);
+    plist_dict_set_item(loadedTimeRanges0, "start", start);
+    plist_array_append_item(loadedTimeRanges, loadedTimeRanges0);
+    plist_dict_set_item(r_node, "loadedTimeRanges", loadedTimeRanges);
+
+    plist_t seekableTimeRanges = plist_new_array();
+    plist_t seekableTimeRanges0 = plist_new_dict();
+    plist_t durationSeek = plist_new_real(300);
+    plist_dict_set_item(seekableTimeRanges0, "duration", durationSeek);
+    plist_t startSeek = plist_new_real(0.0);
+    plist_dict_set_item(seekableTimeRanges0, "start", startSeek);
+    plist_array_append_item(seekableTimeRanges, seekableTimeRanges0);
+    plist_dict_set_item(r_node, "seekableTimeRanges", seekableTimeRanges);
+
+    plist_to_xml(r_node, response_data, (uint32_t *) response_datalen);
+    printf("%s", *response_data);
+    plist_free(r_node);
+
+    http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
 }
 
 static void

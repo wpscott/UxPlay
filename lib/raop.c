@@ -228,7 +228,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
 
-    if (!strcmp(url, "/server-info")) {
+    if (!strcmp(url, "/server-info") || !strcmp(url, "/play") || !strcmp(url, "/playback-info") || strstr(url, "/setProperty")) {
         *response = http_response_init("HTTP/1.1", 200, "OK");  
     } else if (!strcmp(url, "/reverse")) {
         *response = http_response_init("HTTP/1.1", 101, "Switching Protocols");
@@ -258,7 +258,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     if (!strcmp(method, "GET") && !strcmp(url, "/info")) {
         handler = &raop_handler_info;
     } else if (!strcmp(method, "GET") && !strcmp(url, "/server-info")) {
-        handler = &raop_handler_server_info;
+        handler = &http_handler_server_info;
     } else if (!strcmp(method, "POST") && !strcmp(url, "/pair-pin-start")) {
         handler = &raop_handler_pairpinstart;
     } else if (!strcmp(method, "POST") && !strcmp(url, "/pair-setup-pin")) {
@@ -286,7 +286,9 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     } else if (!strcmp(method, "TEARDOWN")) {
         handler = &raop_handler_teardown;
     } else if (!strcmp(method, "POST") && !strcmp(url, "/reverse")) {
-        handler = &raop_handler_reverse;
+        handler = &http_handler_reverse;
+    } else if (!strcmp(method, "GET") && !strcmp(url, "/playback-info")) {
+        handler = &http_handler_playback_info;
     } else {
         logger_log(conn->raop->logger, LOGGER_INFO, "Unhandled Client Request: %s %s", method, url);
     }
