@@ -228,7 +228,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
 
-    if (!strcmp(url, "/server-info") || !strcmp(url, "/play") || !strcmp(url, "/playback-info") || strstr(url, "/setProperty")) {
+    if (!strcmp(url, "/server-info") || !strcmp(url, "/play") || !strcmp(url, "/playback-info") || strstr(url, "/setProperty") || strstr(url, "/rate") || strstr(url, "/getProperty")) {
         *response = http_response_init("HTTP/1.1", 200, "OK");  
     } else if (!strcmp(url, "/reverse")) {
         *response = http_response_init("HTTP/1.1", 101, "Switching Protocols");
@@ -289,6 +289,10 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         handler = &http_handler_reverse;
     } else if (!strcmp(method, "GET") && !strcmp(url, "/playback-info")) {
         handler = &http_handler_playback_info;
+    } else if (strstr(url, "/setProperty")) {
+        handler = &http_handler_set_property;
+    } else if (strstr(url, "/play") || strstr(url, "/rate") || strstr(url, "/getProperty"))  {
+        http_response_add_header(*response, "Content-Length", "0");
     } else {
         logger_log(conn->raop->logger, LOGGER_INFO, "Unhandled Client Request: %s %s", method, url);
     }

@@ -1150,10 +1150,35 @@ http_handler_playback_info(raop_conn_t *conn,
     plist_dict_set_item(r_node, "seekableTimeRanges", seekableTimeRanges);
 
     plist_to_xml(r_node, response_data, (uint32_t *) response_datalen);
+    *response_datalen = *response_datalen - 1; //TODO: Check if this does anything
     printf("%s", *response_data);
     plist_free(r_node);
 
     http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
+}
+
+static void
+http_handler_set_property(raop_conn_t *conn,
+                      http_request_t *request, http_response_t *response,
+                      char **response_data, int *response_datalen)
+{
+    logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_set_property");
+
+    char* urlPiece = (char*) http_request_get_url(request);
+    strremove(urlPiece, "/setProperty?");
+
+    if (!strcmp(urlPiece, "reverseEndTime") || !strcmp(urlPiece, "forwardEndTime") || !strcmp(urlPiece, "actionAtItemEnd")) {
+        plist_t errResponse = plist_new_dict();
+        plist_t errCode = plist_new_uint(0);
+        plist_dict_set_item(errResponse, "errorCode", errCode);
+        plist_to_xml(errResponse, response_data, (uint32_t *) response_datalen);
+        *response_datalen = *response_datalen - 1; //TODO: Check if this does anything
+        printf("%s", *response_data);
+        plist_free(errResponse);
+        http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
+    } else {
+        http_response_add_header(response, "Content-Length", "0");
+    }
 }
 
 static void
