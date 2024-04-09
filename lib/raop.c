@@ -33,6 +33,7 @@
 #include "compat.h"
 #include "raop_rtp_mirror.h"
 #include "raop_ntp.h"
+#include "casting.h"
 
 struct raop_s {
     /* Callbacks for audio and video */
@@ -89,8 +90,7 @@ struct raop_conn_s {
     unsigned char *remote;
     int remotelen;
 
-    const char *cast_session;
-    int castsessionlen;
+    hls_cast_t *castdata;
 
     bool have_active_remote;
 };
@@ -114,6 +114,14 @@ conn_init(void *opaque, unsigned char *local, int locallen, unsigned char *remot
     conn->raop_rtp_mirror = NULL;
     conn->raop_ntp = NULL;
     conn->fairplay = fairplay_init(raop->logger);
+    conn->castdata = calloc(1, sizeof(hls_cast_t));
+    conn->castdata->cast_session = NULL;
+    conn->castdata->castsessionlen = 0;
+    conn->castdata->playback_uuid = NULL;
+    conn->castdata->playback_location = NULL;
+    if (!conn->castdata) {
+        logger_log(conn->raop->logger, LOGGER_CRIT, "Aw Hell Nah wtf bro");
+    }
 
     if (!conn->fairplay) {
         free(conn);
@@ -228,7 +236,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
 
-    if (!strcmp(url, "/server-info") || !strcmp(url, "/play") || !strcmp(url, "/playback-info") || strstr(url, "/setProperty") || strstr(url, "/rate") || strstr(url, "/getProperty")) {
+    if (!strcmp(url, "/server-info") || !strcmp(url, "/play") || !strcmp(url, "/playback-info") || strstr(url, "/setProperty") || strstr(url, "/rate") || strstr(url, "/getProperty") || strstr(url, "/action")) {
         *response = http_response_init("HTTP/1.1", 200, "OK");  
     } else if (!strcmp(url, "/reverse")) {
         *response = http_response_init("HTTP/1.1", 101, "Switching Protocols");
@@ -291,6 +299,10 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         handler = &http_handler_playback_info;
     } else if (strstr(url, "/setProperty")) {
         handler = &http_handler_set_property;
+    } else if (!strcmp(method, "POST") && !strcmp(url, "/play")) {
+        handler = &http_handler_play;
+    } else if (strstr(url, "/action")) {
+        logger_log(conn->raop->logger, LOGGER_DEBUG, "Unhandled /action");
     } else if (strstr(url, "/play") || strstr(url, "/rate") || strstr(url, "/getProperty"))  {
         http_response_add_header(*response, "Content-Length", "0");
     } else {

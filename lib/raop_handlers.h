@@ -20,6 +20,7 @@
 
 #include "dnssdint.h"
 #include "utils.h"
+#include "casting.h"
 #include <ctype.h>
 #include <stdlib.h>
 #include <plist/plist.h>
@@ -1094,8 +1095,8 @@ http_handler_reverse(raop_conn_t *conn,
 {
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_reverse");
     const char* upgrade;
-    conn->cast_session = http_request_get_header(request, "X-Apple-Session-ID");
-    conn->castsessionlen = strlen(conn->cast_session);
+    conn->castdata->cast_session = http_request_get_header(request, "X-Apple-Session-ID");
+    conn->castdata->castsessionlen = strlen(conn->castdata->cast_session);
     upgrade = http_request_get_header(request, "Upgrade");
     http_response_add_header(response, "Upgrade", upgrade);
     http_response_add_header(response, "Content-Length", "0");
@@ -1178,6 +1179,45 @@ http_handler_set_property(raop_conn_t *conn,
         http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
     } else {
         http_response_add_header(response, "Content-Length", "0");
+    }
+}
+
+static void
+http_handler_play(raop_conn_t *conn,
+                      http_request_t *request, http_response_t *response,
+                      char **response_data, int *response_datalen)
+{
+    logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_play");
+
+    const char *data;
+    int data_len;
+    data = http_request_get_data(request, &data_len);
+    char* playback_location;
+    char* playback_uuid;
+
+    // Parsing bplist
+    plist_t req_root_node = NULL;
+    plist_from_bin(data, data_len, &req_root_node);
+
+    if (PLIST_IS_DICT(req_root_node)) {
+        plist_t puuid = plist_dict_get_item(req_root_node, "uuid");
+        plist_get_string_val(puuid, &playback_uuid);
+        logger_log(conn->raop->logger, LOGGER_ERR, "%d", strlen(playback_uuid));
+        conn->castdata->playback_uuid = malloc(strlen(playback_uuid) + 1);
+        strcpy(conn->castdata->playback_uuid, playback_uuid);
+
+        plist_t plocation = plist_dict_get_item(req_root_node, "Content-Location");
+        plist_get_string_val(plocation, &playback_location);
+        conn->castdata->playback_location = malloc(strlen(playback_location) + 1);
+        strcpy(conn->castdata->playback_location, playback_location);
+
+        if (!isHLSUrl(conn->castdata->playback_location)) {
+            logger_log(conn->raop->logger, LOGGER_DEBUG, "Dont need HLS for this, for the future add a link to Gstreamer to download file and play");
+        } else {
+            logger_log(conn->raop->logger, LOGGER_DEBUG, "Needs HLS Ugh");
+        }
+    } else {
+        logger_log(conn->raop->logger, LOGGER_ERR, "Couldn't find Plist Data for /play, Unhandled");
     }
 }
 
