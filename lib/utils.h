@@ -41,7 +41,7 @@ inline void concatenate_string(char* s, char* s1)
         s[i + j] = s1[i];
     }
  
-    s[i + j] = '\0';
+    //s[i + j] = '\0';
  
     return;
 }

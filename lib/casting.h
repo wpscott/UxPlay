@@ -9,8 +9,10 @@
 #include <stddef.h>
 
 struct hls_cast_s {
-    const char *cast_session;
+    char* port;
+    char *cast_session;
     int castsessionlen;
+    int requestid;
 
     char* playback_uuid;
     char* playback_location;

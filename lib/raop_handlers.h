@@ -1095,8 +1095,6 @@ http_handler_reverse(raop_conn_t *conn,
 {
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_reverse");
     const char* upgrade;
-    conn->castdata->cast_session = http_request_get_header(request, "X-Apple-Session-ID");
-    conn->castdata->castsessionlen = strlen(conn->castdata->cast_session);
     upgrade = http_request_get_header(request, "Upgrade");
     http_response_add_header(response, "Upgrade", upgrade);
     http_response_add_header(response, "Content-Length", "0");
@@ -1202,7 +1200,6 @@ http_handler_play(raop_conn_t *conn,
     if (PLIST_IS_DICT(req_root_node)) {
         plist_t puuid = plist_dict_get_item(req_root_node, "uuid");
         plist_get_string_val(puuid, &playback_uuid);
-        logger_log(conn->raop->logger, LOGGER_ERR, "%d", strlen(playback_uuid));
         conn->castdata->playback_uuid = malloc(strlen(playback_uuid) + 1);
         strcpy(conn->castdata->playback_uuid, playback_uuid);
 
@@ -1211,10 +1208,16 @@ http_handler_play(raop_conn_t *conn,
         conn->castdata->playback_location = malloc(strlen(playback_location) + 1);
         strcpy(conn->castdata->playback_location, playback_location);
 
+        const char* sessionid = http_request_get_header(request, "X-Apple-Session-ID");
+        conn->castdata->cast_session = strdup(sessionid);
+        conn->castdata->castsessionlen = strlen(conn->castdata->cast_session);
+
         if (!isHLSUrl(conn->castdata->playback_location)) {
             logger_log(conn->raop->logger, LOGGER_DEBUG, "Dont need HLS for this, for the future add a link to Gstreamer to download file and play");
         } else {
             logger_log(conn->raop->logger, LOGGER_DEBUG, "Needs HLS Ugh");
+            conn->castdata->requestid = 0;
+            startHLSRequests(conn->castdata);
         }
     } else {
         logger_log(conn->raop->logger, LOGGER_ERR, "Couldn't find Plist Data for /play, Unhandled");

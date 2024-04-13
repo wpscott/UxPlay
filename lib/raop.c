@@ -115,12 +115,16 @@ conn_init(void *opaque, unsigned char *local, int locallen, unsigned char *remot
     conn->raop_ntp = NULL;
     conn->fairplay = fairplay_init(raop->logger);
     conn->castdata = calloc(1, sizeof(hls_cast_t));
+    conn->castdata->port = malloc(sizeof(conn->raop->port)+5);
+    snprintf(conn->castdata->port, sizeof(conn->raop->port)+5, "%hu", conn->raop->port);
     conn->castdata->cast_session = NULL;
     conn->castdata->castsessionlen = 0;
+    conn->castdata->requestid = 0;
     conn->castdata->playback_uuid = NULL;
     conn->castdata->playback_location = NULL;
     if (!conn->castdata) {
-        logger_log(conn->raop->logger, LOGGER_CRIT, "Aw Hell Nah wtf bro");
+        free(conn);
+        return NULL;
     }
 
     if (!conn->fairplay) {
