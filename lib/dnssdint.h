@@ -22,18 +22,18 @@
 
 /* the previous behavior of announcing UxPlay with a fixed public key PK
  * can be restored by uncommenting the following line  */
-//#define PK "b07727d6f6cd6e08b58ede525ec3cdeaa252ad9f683feb212ef8a205246554e7"
+//#define PK "99FD4299889422515FBD27949E4E1E21B2AF50A454499E3D4BE75A4E0F55FE63"
 
 #define RAOP_TXTVERS "1"
 #define RAOP_CH "2"             /* Audio channels: 2 */
 #define RAOP_CN "0,1,2,3"       /* Audio codec: PCM, ALAC, AAC, AAC ELD */
 #define RAOP_ET "0,3,5"         /* Encryption type: None, FairPlay, FairPlay SAPv2.5 */
 #define RAOP_VV "2"
-#define FEATURES_1 "0x5A7FFEE6" /* first 32 bits of features, with bit 27 ("supports legacy pairing") ON */
-//#define FEATURES_1 "0x527FFEE6" /* first 32 bits of features, with bit 27 ("supports legacy pairing") OFF */
+//#define FEATURES_1 "0x5A7FFEE6" /* first 32 bits of features, with bit 27 ("supports legacy pairing") ON */
+#define FEATURES_1 "0x527FFFF7" /* first 32 bits of features, with bit 27 ("supports legacy pairing") OFF */
 #define FEATURES_2  "0x0"        /* second 32 bits of features */
 #define RAOP_RHD "5.6.0.0"
-#define RAOP_SF "0x4"
+#define RAOP_SF "0x04"
 #define RAOP_SV "false"
 #define RAOP_DA "true"
 #define RAOP_SR "44100"         /* Sample rate: 44100 */
@@ -44,8 +44,9 @@
 #define RAOP_VN "65537"
 
 #define AIRPLAY_SRCVERS GLOBAL_VERSION /*defined in global.h */
-#define AIRPLAY_FLAGS "0x4"
+#define AIRPLAY_FLAGS "0x04"
 #define AIRPLAY_VV "2"
-#define AIRPLAY_PI "2e388006-13ba-4041-9a67-25dd4a43d536"
+//#define AIRPLAY_PI "2e388006-13ba-4041-9a67-25dd4a43d536"
+#define AIRPLAY_PI "b08f5a79-db29-4384-b456-a4784d9e6055"
 
 #endif

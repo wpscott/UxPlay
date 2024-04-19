@@ -65,6 +65,12 @@ struct raop_ntp_s {
     mutex_handle_t wait_mutex;
     cond_handle_t wait_cond;
 
+    mutex_handle_t cast_mutex;
+    cond_handle_t cast_cond;
+
+    mutex_handle_t castwait_mutex;
+    cond_handle_t castwait_cond;
+
     raop_ntp_data_t data[RAOP_NTP_DATA_COUNT];
     int data_index;
 
@@ -273,6 +279,7 @@ raop_ntp_thread(void *arg)
     bool conn_reset = false;
     bool logger_debug = (logger_get_level(raop_ntp->logger) >= LOGGER_DEBUG);
       
+    pthread_cond_wait(&raop_ntp->cast_cond, &raop_ntp->cast_mutex);
     while (1) {
         MUTEX_LOCK(raop_ntp->run_mutex);
         if (!raop_ntp->running) {
@@ -369,6 +376,7 @@ raop_ntp_thread(void *arg)
             }
         }
 
+        pthread_cond_signal(&raop_ntp->castwait_cond);
         // Sleep for 3 seconds
         struct timespec wait_time;
         MUTEX_LOCK(raop_ntp->wait_mutex);
@@ -411,6 +419,7 @@ raop_ntp_start(raop_ntp_t *raop_ntp, unsigned short *timing_lport, int max_ntp_t
 
     /* Initialize ports and sockets */
     if (raop_ntp->remote_saddr.ss_family == AF_INET6) {
+        logger_log(raop_ntp->logger, LOGGER_DEBUG, "raop_ntp using IPv6");
         use_ipv6 = 1;
     }
     //use_ipv6 = 0;
@@ -427,6 +436,13 @@ raop_ntp_start(raop_ntp_t *raop_ntp, unsigned short *timing_lport, int max_ntp_t
     
     THREAD_CREATE(raop_ntp->thread, raop_ntp_thread, raop_ntp);
     MUTEX_UNLOCK(raop_ntp->run_mutex);
+}
+
+void
+raop_ntp_cast_start(raop_ntp_t *raop_ntp) {
+    assert(raop_ntp);
+    pthread_cond_signal(&raop_ntp->cast_cond);
+    pthread_cond_wait(&raop_ntp->castwait_cond, &raop_ntp->castwait_mutex);
 }
 
 void

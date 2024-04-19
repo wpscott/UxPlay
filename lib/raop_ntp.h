@@ -29,6 +29,8 @@ typedef enum timing_protocol_e { NTP, TP_NONE, TP_OTHER, TP_UNSPECIFIED } timing
 
 void raop_ntp_start(raop_ntp_t *raop_ntp, unsigned short *timing_lport, int max_ntp_timeouts);
 
+void raop_ntp_cast_start(raop_ntp_t *raop_ntp);
+
 void raop_ntp_stop(raop_ntp_t *raop_ntp);
 
 unsigned short raop_ntp_get_port(raop_ntp_t *raop_ntp);

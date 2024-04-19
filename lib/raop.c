@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
 
 #include "raop.h"
 #include "raop_rtp.h"
@@ -32,6 +33,7 @@
 #include "compat.h"
 #include "raop_rtp_mirror.h"
 #include "raop_ntp.h"
+#include "casting.h"
 
 struct raop_s {
     /* Callbacks for audio and video */
@@ -88,6 +90,8 @@ struct raop_conn_s {
     unsigned char *remote;
     int remotelen;
 
+    hls_cast_t *castdata;
+
     bool have_active_remote;
 };
 typedef struct raop_conn_s raop_conn_t;
@@ -110,6 +114,18 @@ conn_init(void *opaque, unsigned char *local, int locallen, unsigned char *remot
     conn->raop_rtp_mirror = NULL;
     conn->raop_ntp = NULL;
     conn->fairplay = fairplay_init(raop->logger);
+    conn->castdata = calloc(1, sizeof(hls_cast_t));
+    conn->castdata->port = malloc(sizeof(conn->raop->port)+5);
+    snprintf(conn->castdata->port, sizeof(conn->raop->port)+5, "%hu", conn->raop->port);
+    conn->castdata->cast_session = NULL;
+    conn->castdata->castsessionlen = 0;
+    conn->castdata->requestid = 0;
+    conn->castdata->playback_uuid = NULL;
+    conn->castdata->playback_location = NULL;
+    if (!conn->castdata) {
+        free(conn);
+        return NULL;
+    }
 
     if (!conn->fairplay) {
         free(conn);
@@ -187,7 +203,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
 
-    if (!method || !cseq) {
+    if (!method) {
         return;
     }
     logger_log(conn->raop->logger, LOGGER_DEBUG, "\n%s %s RTSP/1.0", method, url);
@@ -224,16 +240,37 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
 
-    *response = http_response_init("RTSP/1.0", 200, "OK");
+    if (!strcmp(url, "/server-info") || !strcmp(url, "/play") || !strcmp(url, "/playback-info") || strstr(url, "/setProperty") || strstr(url, "/rate") || strstr(url, "/getProperty") || strstr(url, "/action")) {
+        *response = http_response_init("HTTP/1.1", 200, "OK");  
+    } else if (!strcmp(url, "/reverse")) {
+        *response = http_response_init("HTTP/1.1", 101, "Switching Protocols");
+    } else {
+        *response = http_response_init("RTSP/1.0", 200, "OK");
+    }
 
-    http_response_add_header(*response, "CSeq", cseq);
-    //http_response_add_header(*response, "Apple-Jack-Status", "connected; type=analog");
+    if (!strcmp(method, "RECORD")) {
+        http_response_add_header(*response, "Audio-Latency", "0");
+    } else {
+        http_response_add_header(*response, "Audio-Jack-Status", "Connected; type=digital");
+    }
+    if (!strcmp(url, "/reverse")) {
+        const char *reverseconn;
+        reverseconn = http_request_get_header(request, "Connection");
+        http_response_add_header(*response, "Connection", reverseconn);
+    }
+    if (cseq) {
+        http_response_add_header(*response, "CSeq", cseq);
+    }
+    http_response_add_header(*response, "Date", gmt_time_string());
     http_response_add_header(*response, "Server", "AirTunes/"GLOBAL_VERSION);
+    http_response_add_header(*response, "Session", "CAFEBABE");
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "Handling request %s with URL %s", method, url);
     raop_handler_t handler = NULL;
     if (!strcmp(method, "GET") && !strcmp(url, "/info")) {
         handler = &raop_handler_info;
+    } else if (!strcmp(method, "GET") && !strcmp(url, "/server-info")) {
+        handler = &http_handler_server_info;
     } else if (!strcmp(method, "POST") && !strcmp(url, "/pair-pin-start")) {
         handler = &raop_handler_pairpinstart;
     } else if (!strcmp(method, "POST") && !strcmp(url, "/pair-setup-pin")) {
@@ -260,6 +297,18 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         handler = &raop_handler_flush;
     } else if (!strcmp(method, "TEARDOWN")) {
         handler = &raop_handler_teardown;
+    } else if (!strcmp(method, "POST") && !strcmp(url, "/reverse")) {
+        handler = &http_handler_reverse;
+    } else if (!strcmp(method, "GET") && !strcmp(url, "/playback-info")) {
+        handler = &http_handler_playback_info;
+    } else if (strstr(url, "/setProperty")) {
+        handler = &http_handler_set_property;
+    } else if (!strcmp(method, "POST") && !strcmp(url, "/play")) {
+        handler = &http_handler_play;
+    } else if (strstr(url, "/action")) {
+        logger_log(conn->raop->logger, LOGGER_DEBUG, "Unhandled /action");
+    } else if (strstr(url, "/play") || strstr(url, "/rate") || strstr(url, "/getProperty"))  {
+        http_response_add_header(*response, "Content-Length", "0");
     } else {
         logger_log(conn->raop->logger, LOGGER_INFO, "Unhandled Client Request: %s %s", method, url);
     }
@@ -575,4 +624,15 @@ void
 raop_stop(raop_t *raop) {
     assert(raop);
     httpd_stop(raop->httpd);
+}
+
+const char *gmt_time_string() {
+  static char date_buf[64];
+  memset(date_buf, 0, 64);
+
+  time_t now = time(0);
+  if (strftime(date_buf, 64, "%c GMT", gmtime(&now))) {
+    return date_buf;
+  }else
+    return 0;
 }
