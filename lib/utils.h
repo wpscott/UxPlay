@@ -19,6 +19,7 @@
 #define UTILS_H
 
 #include <stdint.h>
+#include <string.h>
 
 char *utils_strsep(char **stringp, const char *delim);
 int utils_read_file(char **dst, const char *pemstr);

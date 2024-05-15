@@ -1,11 +1,15 @@
 /* File that Handles Information about Casting
 GenghisKhanDrip*/
 
-#include "casting.h"
+
 #include <regex.h>
 #include <stdio.h>
 #include "utils.h"
 #include <plist/plist.h>
+#include <stdlib.h>
+
+#include "casting.h"
+
 
 bool isHLSUrl(char* url) {
     regex_t checkHTTP;
