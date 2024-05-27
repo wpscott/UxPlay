@@ -33,6 +33,13 @@
 #define GCM_AUTHTAG_SIZE 16
 #define SHA512_KEY_LENGTH 64
 
+typedef enum session_type_e {
+  SESSION_TYPE_UNKNOWN,
+  SESSION_TYPE_RAOP,
+  SESSION_TYPE_CASTING
+} session_type_t;
+
+
 typedef struct pairing_s pairing_t;
 typedef struct pairing_session_s pairing_session_t;
 
@@ -62,4 +69,13 @@ int srp_confirm_pair_setup(pairing_session_t *session, pairing_t *pairing, unsig
                            unsigned char *auth_tag);
 void access_client_session_data(pairing_session_t *session, char **username, char **client_pk, bool *setup);
 void ed25519_pk_to_base64(const unsigned char *pk, char **pk64);
+void set_pairing_session_type(pairing_session_t *session, session_type_t session_type);
+session_type_t get_pairing_session_type(pairing_session_t *session);
+void set_pairing_session_num(pairing_session_t *session, unsigned char session_num);
+unsigned char get_pairing_session_num(pairing_session_t *session);
 #endif
+
+
+
+
+

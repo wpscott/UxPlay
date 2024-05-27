@@ -48,7 +48,10 @@ typedef enum {
 
 struct pairing_session_s {
     status_t status;
-
+  
+    session_type_t session_type;
+    unsigned char session_num;
+  
     ed25519_key_t *ed_ours;
     ed25519_key_t *ed_theirs;
 
@@ -63,6 +66,22 @@ struct pairing_session_s {
     /* srp items */
     srp_t *srp;
 };
+
+void set_pairing_session_type(pairing_session_t *session, session_type_t session_type) {
+    session->session_type = session_type;
+}
+
+session_type_t  get_pairing_session_type(pairing_session_t *session) {
+    return session->session_type;
+}
+
+void set_pairing_session_num(pairing_session_t *session, unsigned char session_num) {
+    session->session_num = session_num;
+}
+
+unsigned char get_pairing_session_num(pairing_session_t *session) {
+    return session->session_num;
+}
 
 static int
 derive_key_internal(pairing_session_t *session, const unsigned char *salt, unsigned int saltlen, unsigned char *key, unsigned int keylen)
@@ -134,6 +153,8 @@ pairing_session_init(pairing_t *pairing)
 
     session->ed_ours = ed25519_key_copy(pairing->ed);
 
+    session->session_type = SESSION_TYPE_UNKNOWN;
+    session->session_num = 0;
     session->status = STATUS_INITIAL;
     session->srp = NULL;
     session->pair_setup = false;

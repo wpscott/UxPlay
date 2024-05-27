@@ -74,6 +74,8 @@ struct raop_s {
   
      /* public key as string */
      char pk_str[2*ED25519_KEY_SIZE + 1];
+
+     unsigned char next_session;
 };
 
 struct raop_conn_s {
@@ -93,6 +95,7 @@ struct raop_conn_s {
     hls_cast_t *castdata;
 
     bool have_active_remote;
+
 };
 typedef struct raop_conn_s raop_conn_t;
 
@@ -138,6 +141,9 @@ conn_init(void *opaque, unsigned char *local, int locallen, unsigned char *remot
         return NULL;
     }
 
+    raop->next_session++;
+    set_pairing_session_num(conn->session, raop->next_session);
+    
     if (locallen == 4) {
         logger_log(conn->raop->logger, LOGGER_INFO,
                    "Local: %d.%d.%d.%d",
@@ -174,7 +180,7 @@ conn_init(void *opaque, unsigned char *local, int locallen, unsigned char *remot
     if (raop->callbacks.conn_init) {
         raop->callbacks.conn_init(raop->callbacks.cls);
     }
-
+    logger_log(conn->raop->logger, LOGGER_INFO, "initialize new connection, session_num %u", get_pairing_session_num(conn->session));
     return conn;
 }
 
@@ -186,12 +192,30 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     const char *cseq;
     char *response_data = NULL;
     int response_datalen = 0;
-    logger_log(conn->raop->logger, LOGGER_DEBUG, "conn_request");
+
+    cseq = http_request_get_header(request, "CSeq");
+    session_type_t session_type = get_pairing_session_type(conn->session);
+    if (session_type == SESSION_TYPE_UNKNOWN) {
+        if (cseq) {
+            set_pairing_session_type(conn->session, SESSION_TYPE_RAOP);
+        } else {
+            set_pairing_session_type(conn->session, SESSION_TYPE_CASTING);
+        }
+        session_type = get_pairing_session_type(conn->session);
+    }
+
+    logger_log(conn->raop->logger, LOGGER_DEBUG, "conn_request, session_num %u type %d", get_pairing_session_num(conn->session), session_type);
+
+    if (cseq) {
+        assert(session_type == SESSION_TYPE_RAOP);
+    } else {
+        assert(session_type == SESSION_TYPE_CASTING);
+    }
+    
     bool logger_debug = (logger_get_level(conn->raop->logger) >= LOGGER_DEBUG);
 
     method = http_request_get_method(request);
     url = http_request_get_url(request);
-    cseq = http_request_get_header(request, "CSeq");
     if (!conn->have_active_remote) {
         const char *active_remote = http_request_get_header(request, "Active-Remote");
         if (active_remote) {
@@ -443,6 +467,7 @@ raop_init(raop_callbacks_t *callbacks) {
     raop->max_ntp_timeouts = 0;
     raop->audio_delay_micros = 250000;
 
+    raop->next_session = 0;
     return raop;
 }
 
