@@ -41,26 +41,47 @@ bool isHLSUrl(char* url) {
 
 void startHLSRequests(hls_cast_t *cast)
 {
-
+  const char *end = NULL;
     const char* found = strstr(cast->playback_location, "://");
-
     if (found) {
+        const char* address = found + 3;
+        end = strstr(address, "localhost");
+        if (end) {
+             end +=  9;
+        } else {
+             end = strstr(address, "127.0.0.1");
+	     if (end) {
+	       end += 9;
+	     }
+	}
+    }
+    
+    if (end) {
         // Calculate the length up to the delimiter
         size_t length = found - cast->playback_location;
 
         // Extract the substring
-        char protocol[length];
+        char protocol[length + 1];
         strncpy(protocol, cast->playback_location, length);
-
+        protocol[length] = '\0';
+	
         printf("Result: %s\n", protocol);
 
-        char* hostname1 = "localhost:";
-        char* hostname = malloc(strlen(hostname1) + strlen(cast->port));
-        strcpy(hostname, hostname1);
-        concatenate_string(hostname, cast->port);
-        str_replace(cast->playback_location, protocol, "http");
-        str_replace(cast->playback_location, "127.0.0.1", hostname);
-        str_replace(cast->playback_location, "localhost", hostname);
+	char first[] = "http://localhost:";
+        size_t len1 = strlen(first);
+	size_t len2 = strlen(cast->port);
+	size_t len3 = strlen(end) + 1;
+	char* location = (char *) malloc( len1 + len2 + len3);
+	char *ptr = location;
+	strncpy(ptr, first, len1);
+	ptr += len1;
+	strncpy(ptr, cast->port,len2);
+	ptr += len2;
+	strncpy(ptr, end,len3);
+	free (cast->playback_location);
+	cast->playback_location = location;
+
+	
         printf("String is %s\n", cast->playback_location);
 
         plist_t fcup_req = plist_new_dict();
