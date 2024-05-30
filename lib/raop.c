@@ -173,16 +173,20 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
 
     if (conn->connection_type == CONNECTION_TYPE_UNKNOWN) {
         if (httpd_count_connection_type(conn->raop->httpd, CONNECTION_TYPE_RAOP)) {
-	    char ipaddr[40];
-	    utils_ipaddress_to_string(conn->remotelen, conn->remote, conn->zone_id, ipaddr, (int) (sizeof(ipaddr)));
-            logger_log(conn->raop->logger, LOGGER_WARNING, "rejecting new connection request from %s", ipaddr);	  
-	    *response = http_response_init("RTSP/1.0", 409, "Conflict: Server is connected to another client");
+            char ipaddr[40];
+            utils_ipaddress_to_string(conn->remotelen, conn->remote, conn->zone_id, ipaddr, (int) (sizeof(ipaddr)));
+            logger_log(conn->raop->logger, LOGGER_WARNING, "rejecting new connection request from %s", ipaddr);
+            *response = http_response_init("RTSP/1.0", 409, "Conflict: Server is connected to another client");
             http_response_add_header(*response, "CSeq", cseq);
             http_response_add_header(*response, "Server", "AirTunes/"GLOBAL_VERSION);
-	    goto finish;
-        }      
-        httpd_set_connection_type(conn->raop->httpd, ptr, CONNECTION_TYPE_RAOP);
-        conn->connection_type = CONNECTION_TYPE_RAOP;
+            goto finish;
+        } else if (cseq) {
+            httpd_set_connection_type(conn->raop->httpd, ptr, CONNECTION_TYPE_RAOP);
+            conn->connection_type = CONNECTION_TYPE_RAOP;
+        } else {
+            httpd_set_connection_type(conn->raop->httpd, ptr, CONNECTION_TYPE_AIRPLAY);
+            conn->connection_type = CONNECTION_TYPE_AIRPLAY;
+        } 
     }
 
     if (!conn->have_active_remote) {
@@ -200,11 +204,6 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         return;
     }
 
-    /* this rejects unsupported messages from _airplay._tcp for video streaming protocol*/
-    if (!cseq) {
-        return;
-    }
-    
     logger_log(conn->raop->logger, LOGGER_DEBUG, "\n%s %s %s", method, url, protocol);
     char *header_str= NULL; 
     http_request_get_header_string(request, &header_str);
