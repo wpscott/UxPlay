@@ -165,7 +165,7 @@ raop_rtp_mirror_t *raop_rtp_mirror_init(logger_t *logger, raop_callbacks_t *call
 }
 
 void
-raop_rtp_init_mirror_aes(raop_rtp_mirror_t *raop_rtp_mirror, uint64_t *streamConnectionID)
+raop_rtp_mirror_init_aes(raop_rtp_mirror_t *raop_rtp_mirror, uint64_t *streamConnectionID)
 {
     mirror_buffer_init_aes(raop_rtp_mirror->buffer, streamConnectionID);
 }
@@ -699,7 +699,7 @@ raop_rtp_mirror_thread(void *arg)
 }
 
 static int
-raop_rtp_init_mirror_sockets(raop_rtp_mirror_t *raop_rtp_mirror, int use_ipv6)
+raop_rtp_mirror_init_sockets(raop_rtp_mirror_t *raop_rtp_mirror, int use_ipv6)
 {
     assert(raop_rtp_mirror);
 
@@ -729,7 +729,7 @@ raop_rtp_init_mirror_sockets(raop_rtp_mirror_t *raop_rtp_mirror, int use_ipv6)
 }
 
 void
-raop_rtp_start_mirror(raop_rtp_mirror_t *raop_rtp_mirror, unsigned short *mirror_data_lport,
+raop_rtp_mirror_start(raop_rtp_mirror_t *raop_rtp_mirror, unsigned short *mirror_data_lport,
                       uint8_t show_client_FPS_data)
 {
     logger_log(raop_rtp_mirror->logger, LOGGER_INFO, "raop_rtp_mirror starting mirroring");
@@ -751,7 +751,7 @@ raop_rtp_start_mirror(raop_rtp_mirror_t *raop_rtp_mirror, unsigned short *mirror
     //use_ipv6 = 0;
      
     raop_rtp_mirror->mirror_data_lport = *mirror_data_lport;
-    if (raop_rtp_init_mirror_sockets(raop_rtp_mirror, use_ipv6) < 0) {
+    if (raop_rtp_mirror_init_sockets(raop_rtp_mirror, use_ipv6) < 0) {
         logger_log(raop_rtp_mirror->logger, LOGGER_ERR, "raop_rtp_mirror initializing sockets failed");
         MUTEX_UNLOCK(raop_rtp_mirror->run_mutex);
         return;
