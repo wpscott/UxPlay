@@ -97,6 +97,7 @@ struct raop_conn_s {
 typedef struct raop_conn_s raop_conn_t;
 
 #include "raop_handlers.h"
+#include "http_handlers.h"
 
 static void *
 conn_init(void *opaque, unsigned char *local, int locallen, unsigned char *remote, int remotelen, unsigned int zone_id) {
@@ -172,7 +173,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     const char *cseq = http_request_get_header(request, "CSeq");
 
     if (conn->connection_type == CONNECTION_TYPE_UNKNOWN) {
-        if (httpd_count_connection_type(conn->raop->httpd, CONNECTION_TYPE_RAOP)) {
+        if (cseq && httpd_count_connection_type(conn->raop->httpd, CONNECTION_TYPE_RAOP)) {
             char ipaddr[40];
             utils_ipaddress_to_string(conn->remotelen, conn->remote, conn->zone_id, ipaddr, (int) (sizeof(ipaddr)));
             logger_log(conn->raop->logger, LOGGER_WARNING, "rejecting new connection request from %s", ipaddr);
@@ -238,49 +239,101 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
 
-    *response = http_response_init(protocol, 200, "OK");
 
-    http_response_add_header(*response, "CSeq", cseq);
-    //http_response_add_header(*response, "Apple-Jack-Status", "connected; type=analog");
+    if (!strcmp(url, "/reverse")) {
+        *response = http_response_init(protocol, 101, "Switching Protocols");
+    } else {
+        *response = http_response_init(protocol, 200, "OK");
+    }
+
+    if (cseq) {
+    /* is this really necessary? or is it obsolete? */
+        if (strcmp(method, "RECORD")) {
+	    http_response_add_header(*response, "Audio-Jack-Status", "connected; type=digital");
+        }
+        http_response_add_header(*response, "CSeq", cseq);
+    }
     http_response_add_header(*response, "Server", "AirTunes/"GLOBAL_VERSION);
+
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "Handling request %s with URL %s", method, url);
     raop_handler_t handler = NULL;
-    if (!strcmp(method, "GET") && !strcmp(url, "/info")) {
-        handler = &raop_handler_info;
-    } else if (!strcmp(method, "POST") && !strcmp(url, "/pair-pin-start")) {
-        handler = &raop_handler_pairpinstart;
-    } else if (!strcmp(method, "POST") && !strcmp(url, "/pair-setup-pin")) {
-        handler = &raop_handler_pairsetup_pin;
-    } else if (!strcmp(method, "POST") && !strcmp(url, "/pair-setup")) {
-        handler = &raop_handler_pairsetup;
-    } else if (!strcmp(method, "POST") && !strcmp(url, "/pair-verify")) {
-        handler = &raop_handler_pairverify;
-    } else if (!strcmp(method, "POST") && !strcmp(url, "/fp-setup")) {
-        handler = &raop_handler_fpsetup;
-    } else if (!strcmp(method, "OPTIONS")) {
-        handler = &raop_handler_options;
-    } else if (!strcmp(method, "SETUP")) {
-        handler = &raop_handler_setup;
-    } else if (!strcmp(method, "GET_PARAMETER")) {
-        handler = &raop_handler_get_parameter;
-    } else if (!strcmp(method, "SET_PARAMETER")) {
-        handler = &raop_handler_set_parameter;
-    } else if (!strcmp(method, "POST") && !strcmp(url, "/feedback")) {
-        handler = &raop_handler_feedback;
-    } else if (!strcmp(method, "RECORD")) {
-        handler = &raop_handler_record;
-    } else if (!strcmp(method, "FLUSH")) {
-        handler = &raop_handler_flush;
-    } else if (!strcmp(method, "TEARDOWN")) {
-        handler = &raop_handler_teardown;
-    } else {
-        logger_log(conn->raop->logger, LOGGER_INFO, "Unhandled Client Request: %s %s", method, url);
-    }
+    if (!strcmp(protocol, "RTSP/1.0")) {
+        if (!strcmp(method, "POST")) {
+            if (!strcmp(url, "/feedback")) {
+                handler = &raop_handler_feedback;
+	    } else if (!strcmp(url, "/pair-pin-start")) {
+                handler = &raop_handler_pairpinstart;
+            } else if (!strcmp(url, "/pair-setup-pin")) {
+                handler = &raop_handler_pairsetup_pin;
+            } else if (!strcmp(url, "/pair-setup")) {
+                handler = &raop_handler_pairsetup;
+            } else if (!strcmp(url, "/pair-verify")) {
+                handler = &raop_handler_pairverify;
+            } else if (!strcmp(url, "/fp-setup")) {
+                handler = &raop_handler_fpsetup;
+            } else if (!strcmp(url, "/getProperty")) {
+                handler = &http_handler_get_property;
+            } else if (!strcmp(url, "/audioMode")) {
+                //handler = &http_handler_audioMode;
+            }
+        } else if (!strcmp(method, "GET")) {
+            if (!strcmp(url, "/info")) {
+                handler = &raop_handler_info;
+            }
+        } else if (!strcmp(method, "OPTIONS")) {
+            handler = &raop_handler_options;
+        } else if (!strcmp(method, "SETUP")) {
+            handler = &raop_handler_setup;
+        } else if (!strcmp(method, "GET_PARAMETER")) {
+            handler = &raop_handler_get_parameter;
+        } else if (!strcmp(method, "SET_PARAMETER")) {
+            handler = &raop_handler_set_parameter;
+        } else if (!strcmp(method, "RECORD")) {
+            handler = &raop_handler_record;
+        } else if (!strcmp(method, "FLUSH")) {
+            handler = &raop_handler_flush;
+        } else if (!strcmp(method, "TEARDOWN")) {
+            handler = &raop_handler_teardown;
+        }
+    } else if (!strcmp(protocol, "HTTP/1.1")) {
+        if (!strcmp(method, "POST")) {
+            if (!strcmp(url, "/reverse")) {
+                handler = &http_handler_reverse;
+            } else if (!strcmp(url, "/play")) {
+                handler = &http_handler_play;
+            } else if (!strcmp(url, "/scrub")) {
+                handler = &http_handler_scrub;
+            } else if (!strcmp(url, "/rate")) {
+                handler = &http_handler_rate;
+            } else if (!strcmp(url, "/stop")) {
+                handler = &http_handler_stop;
+            } else if (!strcmp(url, "/action")) {
+                handler = &http_handler_action;
+            } else if (!strcmp(url, "/fp-setup2")) {
+                handler = &http_handler_fpsetup2;
+            }
+        } else if (!strcmp(method, "GET")) {
+            if (!strcmp(url, "/server-info")) {
+                handler = &http_handler_server_info;
+            } else if (!strcmp(url, "/playback-info")) {
+                handler = &http_handler_playback_info;
+            }
+        } else if (!strcmp(method, "PUT")) {
+            if (!strcmp(method, "/set_property")) {
+                handler = &http_handler_set_property;
+            }
+        }
+    }    
 
     if (handler != NULL) {
         handler(conn, request, *response, &response_data, &response_datalen);
+    } else {
+      logger_log(conn->raop->logger, LOGGER_INFO,
+		 "Unhandled Client Request: %s %s %s", method, url, protocol);
     }
+
+
     finish:;
     http_response_finish(*response, response_data, response_datalen);
 
