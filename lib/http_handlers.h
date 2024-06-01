@@ -1,4 +1,4 @@
-#include "casting.h"
+#include "airplay_video.h"
 
 static void
 http_handler_server_info(raop_conn_t *conn,
@@ -54,6 +54,20 @@ http_handler_server_info(raop_conn_t *conn,
     plist_free(r_node);
     http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
     free(hw_addr);
+
+    char remote[40];
+    int len = utils_ipaddress_to_string(conn->remotelen, conn->remote, conn->zone_id, remote, (int) sizeof(remote));
+    if (!len || len > sizeof(remote)) {
+        char *str = utils_data_to_string(conn->remote, conn->remotelen, 16);
+        logger_log(conn->raop->logger, LOGGER_ERR, "failed to extract valid client ip address:\n"
+                   "*** UxPlay will be unable to send communications to client.\n"
+                   "*** address length %d, zone_id %u address data:\n%sparser returned \"%s\"\n",
+                   conn->remotelen, conn->zone_id, str, remote);
+         free(str);
+    }
+    conn->airplay_video =  (void *) airplay_video_init(conn->raop->logger, conn->raop->callbacks, conn,
+                                                       conn->raop, remote, conn->remotelen);
+
 }
 
 static void
@@ -69,10 +83,11 @@ http_handler_reverse(raop_conn_t *conn,
                         http_request_t *request, http_response_t *response,
                         char **response_data, int *response_datalen) {
 
-  //conn->cast_session = http_request_get_header(request, "X-Apple-Session-ID");
+    const char *purpose = http_request_get_header(request, "X-Apple-Session-Purpose");
     const char *connection = http_request_get_header(request, "Connection");
     const char *upgrade = http_request_get_header(request, "Upgrade");
-    logger_log(conn->raop->logger, LOGGER_INFO, "client requested reverse connection: %s  \"%s\"", connection, upgrade);
+    logger_log(conn->raop->logger, LOGGER_INFO, "client requested reverse connection: %s; purpose: %s  \"%s\"",
+        connection, upgrade, purpose);
     http_response_add_header(response, "Connection", connection);
     http_response_add_header(response, "Upgrade", upgrade);
     *response_data = NULL;
@@ -352,6 +367,8 @@ http_handler_play(raop_conn_t *conn,
         logger_log(conn->raop->logger, LOGGER_ERR, "Unsupported Scheme %s", casting_data->scheme);
         goto play_error;
     }
+
+    airplay_video_start(conn->airplay_video, casting_data); 
     
     response_data = NULL;
     response_datalen = 0;
@@ -371,22 +388,3 @@ http_handler_play(raop_conn_t *conn,
     response_datalen = 0;
     return;
 }
-   
-void casting_data_destroy(casting_data_t *casting_data) {
-    if (casting_data) {
-        if (casting_data->session_id) {
-        free(casting_data->session_id);
-    }
-    if (casting_data->uuid) {
-        free(casting_data->uuid);
-    }
-    if (casting_data->location) {
-        free(casting_data->location);
-    }
-    if (casting_data->scheme) {
-        free(casting_data->scheme);
-    }
-    free(casting_data);
-  }
-} 
-

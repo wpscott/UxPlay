@@ -92,6 +92,10 @@ struct raop_conn_s {
 
     connection_type_t connection_type; 
 
+    char *client_session_id;
+
+    void *airplay_video;
+  
     bool have_active_remote;
 };
 typedef struct raop_conn_s raop_conn_t;
@@ -148,6 +152,9 @@ conn_init(void *opaque, unsigned char *local, int locallen, unsigned char *remot
     conn->remotelen = remotelen;
 
     conn->connection_type = CONNECTION_TYPE_UNKNOWN;
+    conn->client_session_id = NULL;
+    conn->airplay_video = NULL;
+
 
     conn->have_active_remote = false;
     
@@ -255,6 +262,15 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     }
     http_response_add_header(*response, "Server", "AirTunes/"GLOBAL_VERSION);
 
+    if (!cseq) {
+        const char *client_session_id = http_request_get_header(request, "X-Apple-Session-ID");
+        if (!conn->client_session_id) {
+            size_t len = strlen(client_session_id) + 1;
+            conn->client_session_id = (char *) malloc(len);
+            strncpy(conn->client_session_id, client_session_id, len);
+        }
+        assert(!strcmp(client_session_id, conn->client_session_id));
+    }
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "Handling request %s with URL %s", method, url);
     raop_handler_t handler = NULL;
@@ -406,6 +422,13 @@ conn_destroy(void *ptr) {
     free(conn->remote);
     pairing_session_destroy(conn->session);
     fairplay_destroy(conn->fairplay);
+    if (conn->client_session_id) {
+        free(conn->client_session_id);
+    }
+    if (conn->airplay_video) {
+        airplay_video_destroy(conn->airplay_video);
+    }
+
     free(conn);
 }
 
