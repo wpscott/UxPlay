@@ -208,21 +208,34 @@ http_handler_playback_info(raop_conn_t *conn,
 #endif
 }
 
+int query_media_data(const char *url, char **media_data);
+
+static void
+http_handler_get_generic(raop_conn_t *conn,
+                      http_request_t *request, http_response_t *response,
+			  char **response_data, int *response_datalen) {
+    const char *url = http_request_get_url(request);
+    *response_datalen  =  query media_data(url, response_data);
+    http_response_add_header(response, "Content-Type", "application/x-mpegURL; charset=utf-8");
+}
+
 static void
 http_handler_set_property(raop_conn_t *conn,
                       http_request_t *request, http_response_t *response,
-                      char **response_data, int *response_datalen)
-{
-    logger_log(conn->raop->logger, LOGGER_ERR, "client HTTP request PUT setProperty is unhandled");
-    assert(0);
-#if 0
+			  char **response_data, int *response_datalen) {
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_set_property");
 
-    char* urlPiece = (char*) http_request_get_url(request);
-    strremove(urlPiece, "/setProperty?");
+    const char *url = http_request_get_url(request);
+    const char *property = strstr(url, "/setProperty?") + 1;
+    printf("%s\n", property);
 
-    if (!strcmp(urlPiece, "reverseEndTime") || !strcmp(urlPiece, "forwardEndTime") || !strcmp(urlPiece, "actionAtItemEnd")) {
+
+    if (!strcmp(urlPiece, "reverseEndTime") ||
+        !strcmp(urlPiece, "forwardEndTime") ||
+        !strcmp(urlPiece, "actionAtItemEnd")) {
+
+      
         plist_t errResponse = plist_new_dict();
         plist_t errCode = plist_new_uint(0);
         plist_dict_set_item(errResponse, "errorCode", errCode);
