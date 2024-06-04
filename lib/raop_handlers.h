@@ -203,8 +203,8 @@ raop_handler_pairsetup_pin(raop_conn_t *conn,
                            http_request_t *request, http_response_t *response,
                            char **response_data, int *response_datalen) {
 
-    const char *request_data;
-    int request_datalen;
+    const char *request_data = NULL;;
+    int request_datalen = 0;
     bool data_is_plist = false;
     bool logger_debug = (logger_get_level(conn->raop->logger) >= LOGGER_DEBUG);
     request_data = http_request_get_data(request, &request_datalen);
@@ -217,7 +217,8 @@ raop_handler_pairsetup_pin(raop_conn_t *conn,
         free(header_str);
     }
     if (!data_is_plist) {
-        logger_log(conn->raop->logger, LOGGER_INFO, "did not receive expected plist from client, request_datalen = %d");
+        logger_log(conn->raop->logger, LOGGER_INFO, "did not receive expected plist from client, request_datalen = %d",
+                  request_datalen);
         goto authentication_failed;
     }
 
@@ -353,11 +354,7 @@ raop_handler_pairsetup_pin(raop_conn_t *conn,
 	return;
     }
  authentication_failed:;
-    http_response_destroy(response);
-    response = http_response_init("RTSP/1.0", 470, "Client Authentication Failure");
-    const char *cseq = http_request_get_header(request, "CSeq");
-    http_response_add_header(response, "CSeq", cseq);
-    http_response_add_header(response, "Server", "AirTunes/"GLOBAL_VERSION);
+    response = http_response_revise(response, 470, "Client Authentication Failure");
     *response_data = NULL;
     response_datalen = 0;
     return;
