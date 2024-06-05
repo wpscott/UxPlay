@@ -27,19 +27,19 @@ typedef struct time_range_s {
   double duration;
 } time_range_t;
 
-typedef struct time_range_array_s {
-  int num_time_ranges;
-  int max_num_time_ranges;
-  time_range_t *time_ranges;
-} time_ranges_array_t;
-
-
-
-
+typedef struct airplay_video_s {
+  raop_t raop;
+  logger_t *logger;
+  raop_callbacks_t callbacks;
+  raop_conn_t conn;
+  char * session_id;
+  thread_handle_t thread;
+  mutex_handle_t run_mutex;
+} airplay_video_t;
 
 typedef struct playback_info_s {
   char * uuid;
-  unit32_t stallCount;
+  uint32_t stallCount;
   double duration;
   float position;
   double rate;
@@ -47,33 +47,29 @@ typedef struct playback_info_s {
   bool playbackBufferEmpty;
   bool playbackBufferFull;
   bool playbackLikelyToKeepUp;
-  time_range_array_t loadedTimeRanges;
-  time_range_array_t seekableTimeRanges;
+  //  time_range_array_t *loadedTimeRanges;
+  //time_range_array_t *seekableTimeRanges;
 } playback_info_t;
 
 
-typedef struct airplay_video_s {
-  raop_r raop;
-  raop_conn_t conn;
-  char * session_id;
-}
+playback_info_t *airplay_video_acquire_playback_info(const char *session_id);
+void airplay_media_reset();
+void airplay_video_stop(const char *session_id);
+void airplay_video_rate(const char *session_id, double rate);
+void airplay_video_play(const char *session_id, char *location, double start_position);
+void airplay_video_scrub(const char *session_id, double scrub_position);
+int query_media_data(const char *url, char **response_data);
+char * airplay_process_media(char * fcup_response_url, char *  fcup_response_data, int fcup_response_datalen, int request_id);
 
-typedef struct casting_data_s {
-    char *session_id;
-    char *uuid;
-    char *location;
-    char *scheme;
-    float start_pos_ms;
-    char *video_cmd;
-} casting_data_t;
+/* these return NULL when i exceeds max number of time ranges */
+time_range_t *get_loaded_time_range(int i);
+time_range_t *get_seekable_time_range(int i);
 
-void casting_data_destroy(casting_data_t *casting_data);
 
-typedef struct airplay_video_s airplay_video_t;
 
-airplay_video_t *airplay_video_init(logger_t *logger, raop_callbacks_t *callbacks, raop_conn_t *conn,
+airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *callbacks, raop_conn_t *conn,
                                     raop_t *raop, const char *remote, int remotelen);				    
-void airplay_video_start(airplay_video_t *airplay_video, casting_data_t *casting_data);
-void airplay_video_stop(airplay_video_t *airplay_video);
-void airplay_video_destroy(void *airplay_video);
+void airplay_video_service_start(airplay_video_t *airplay_video);
+void airplay_video_service_stop(airplay_video_t *airplay_video);
+void airplay_video_service_destroy(void *airplay_video);
 #endif //AIRPLAY_VIDEO_H

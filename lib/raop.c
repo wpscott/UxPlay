@@ -175,18 +175,22 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     bool logger_debug = (logger_get_level(conn->raop->logger) >= LOGGER_DEBUG);
 
     const char *method = http_request_get_method(request);
+
+    if (!method) {
+        return;
+    }
+
     const char *url = http_request_get_url(request);
     const char *protocol = http_request_get_protocol(request);
     const char *cseq = http_request_get_header(request, "CSeq");
 
+    
     if (conn->connection_type == CONNECTION_TYPE_UNKNOWN) {
         if (cseq && httpd_count_connection_type(conn->raop->httpd, CONNECTION_TYPE_RAOP)) {
             char ipaddr[40];
             utils_ipaddress_to_string(conn->remotelen, conn->remote, conn->zone_id, ipaddr, (int) (sizeof(ipaddr)));
             logger_log(conn->raop->logger, LOGGER_WARNING, "rejecting new connection request from %s", ipaddr);
-            *response = http_response_init("RTSP/1.0", 409, "Conflict: Server is connected to another client");
-            http_response_add_header(*response, "CSeq", cseq);
-            http_response_add_header(*response, "Server", "AirTunes/"GLOBAL_VERSION);
+            *response = http_response_init(protocol, 409, "Conflict: Server is connected to another client");
             goto finish;
         } else if (cseq) {
             httpd_set_connection_type(conn->raop->httpd, ptr, CONNECTION_TYPE_RAOP);
@@ -197,6 +201,9 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         } 
     }
 
+    /* this response code and message  will be modified by the handler if necessary */
+    *response = http_response_init(protocol, 200, "OK");
+    
     if (!conn->have_active_remote) {
         const char *active_remote = http_request_get_header(request, "Active-Remote");
         if (active_remote) {
@@ -208,9 +215,6 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
 
-    if (!method) {
-        return;
-    }
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "\n%s %s %s", method, url, protocol);
     char *header_str= NULL; 
@@ -246,21 +250,12 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
 
-
-    if (!strcmp(url, "/reverse")) {
-        *response = http_response_init(protocol, 101, "Switching Protocols");
-    } else {
-        *response = http_response_init(protocol, 200, "OK");
-    }
-
     if (cseq) {
-    /* is this really necessary? or is it obsolete? */
+    /* is this really necessary? or is it obsolete? (move it to record_handler)*/
         if (strcmp(method, "RECORD")) {
 	    http_response_add_header(*response, "Audio-Jack-Status", "connected; type=digital");
         }
-        http_response_add_header(*response, "CSeq", cseq);
     }
-    http_response_add_header(*response, "Server", "AirTunes/"GLOBAL_VERSION);
 
     if (!cseq) {
         const char *client_session_id = http_request_get_header(request, "X-Apple-Session-ID");
@@ -353,8 +348,11 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
 		 "Unhandled Client Request: %s %s %s", method, url, protocol);
     }
 
-
     finish:;
+    http_response_add_header(*response, "Server", "AirTunes/"GLOBAL_VERSION);
+    if (cseq) {
+        http_response_add_header(*response, "CSeq", cseq);
+    }
     http_response_finish(*response, response_data, response_datalen);
 
     int len;
@@ -396,6 +394,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     }
 }
 
+void airplay_video_service_destroy(void * airplay_video);
 static void
 conn_destroy(void *ptr) {
     raop_conn_t *conn = ptr;
@@ -430,7 +429,7 @@ conn_destroy(void *ptr) {
         free(conn->client_session_id);
     }
     if (conn->airplay_video) {
-        airplay_video_destroy(conn->airplay_video);
+        airplay_video_service_destroy(conn->airplay_video);
     }
 
     free(conn);
