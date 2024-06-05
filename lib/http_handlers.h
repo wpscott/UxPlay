@@ -1,8 +1,7 @@
 #include "airplay_video.h"
 
 static void
-http_handler_server_info(raop_conn_t *conn,
-                            http_request_t *request, http_response_t *response,
+http_handler_server_info(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                             char **response_data, int *response_datalen)  {
 
     assert(conn->raop->dnssd);
@@ -65,24 +64,24 @@ http_handler_server_info(raop_conn_t *conn,
                    conn->remotelen, conn->zone_id, str, remote);
          free(str);
     }
+    int ipv6 = (conn->remotelen == 16 ? 1: 0);
+    const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
     conn->airplay_video =  (void *) airplay_video_service_init(conn->raop->logger, &conn->raop->callbacks, conn,
-                                                               conn->raop, remote, conn->remotelen);
+                                                               conn->raop, remote, ipv6, conn->raop->port, session_id);
 
 }
 
 static void
-http_handler_get_property(raop_conn_t *conn,
-                            http_request_t *request, http_response_t *response,
-                            char **response_data, int *response_datalen) {
+http_handler_get_property(raop_conn_t *conn, http_request_t *request, http_response_t *response,
+                          char **response_data, int *response_datalen) {
   const char *url = http_request_get_url(request);
   const char *property = strstr(url, "/setProperty?") + 1;
   logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_get_property: %s (unhandled)", property);
 }
 
 static void
-http_handler_reverse(raop_conn_t *conn,
-                        http_request_t *request, http_response_t *response,
-                        char **response_data, int *response_datalen) {
+http_handler_reverse(raop_conn_t *conn, http_request_t *request, http_response_t *response,
+                     char **response_data, int *response_datalen) {
 
     const char *purpose = http_request_get_header(request, "X-Apple-Session-Purpose");
     const char *connection = http_request_get_header(request, "Connection");
@@ -95,9 +94,8 @@ http_handler_reverse(raop_conn_t *conn,
 }
 
 static void
-http_handler_scrub(raop_conn_t *conn,
-                      http_request_t *request, http_response_t *response,
-                      char **response_data, int *response_datalen) {
+http_handler_scrub(raop_conn_t *conn, http_request_t *request, http_response_t *response,
+                   char **response_data, int *response_datalen) {
     const char *url = http_request_get_url(request);
     const char *data = strstr(url, "?");
     double scrub_position = 0.0;
@@ -117,9 +115,8 @@ http_handler_scrub(raop_conn_t *conn,
 }
 
 static void
-http_handler_rate(raop_conn_t *conn,
-                     http_request_t *request, http_response_t *response,
-                     char **response_data, int *response_datalen) {
+http_handler_rate(raop_conn_t *conn, http_request_t *request, http_response_t *response,
+                  char **response_data, int *response_datalen) {
 
     const char *url = http_request_get_url(request);
     const char *data = strstr(url, "?");
@@ -140,9 +137,8 @@ http_handler_rate(raop_conn_t *conn,
 }
 
 static void
-http_handler_stop(raop_conn_t *conn,
-                     http_request_t *request, http_response_t *response,
-                     char **response_data, int *response_datalen) {
+http_handler_stop(raop_conn_t *conn, http_request_t *request, http_response_t *response,
+                  char **response_data, int *response_datalen) {
     logger_log(conn->raop->logger, LOGGER_INFO, "client HTTP request POST stop");
     airplay_media_reset();
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
@@ -150,9 +146,8 @@ http_handler_stop(raop_conn_t *conn,
 }
 
 static void
-http_handler_action(raop_conn_t *conn,
-                       http_request_t *request, http_response_t *response,
-                       char **response_data, int *response_datalen) {
+http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t *response,
+                    char **response_data, int *response_datalen) {
 
     bool data_is_plist = false;
     plist_t req_root_node = NULL;

@@ -23,30 +23,40 @@
 #include "logger.h"
 
 typedef struct time_range_s {
-  double start;
-  double duration;
+    double start;
+    double duration;
 } time_range_t;
 
 typedef struct airplay_video_s {
-  raop_t raop;
-  logger_t *logger;
-  raop_callbacks_t callbacks;
-  raop_conn_t conn;
-  char * session_id;
-  thread_handle_t thread;
-  mutex_handle_t run_mutex;
+    raop_t raop;
+    logger_t *logger;
+    raop_callbacks_t callbacks;
+    raop_conn_t conn;
+    char * session_id;
+    thread_handle_t thread;
+    mutex_handle_t run_mutex;
+
+    mutex_handle_t wait_mutex;
+    cond_handle_t wait_cond;
+
+  
+      /* MUTEX LOCKED VARIABLES START */
+    /* These variables only edited mutex locked */
+    int running;
+    int joined;
+
 } airplay_video_t;
 
 typedef struct playback_info_s {
-  char * uuid;
-  uint32_t stallCount;
-  double duration;
-  float position;
-  double rate;
-  bool readyToPlay;
-  bool playbackBufferEmpty;
-  bool playbackBufferFull;
-  bool playbackLikelyToKeepUp;
+    char * uuid;
+    uint32_t stallCount;
+    double duration;
+    float position;
+    double rate;
+    bool readyToPlay;
+    bool playbackBufferEmpty;
+    bool playbackBufferFull;
+    bool playbackLikelyToKeepUp;
   //  time_range_array_t *loadedTimeRanges;
   //time_range_array_t *seekableTimeRanges;
 } playback_info_t;
@@ -68,7 +78,8 @@ time_range_t *get_seekable_time_range(int i);
 
 
 airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *callbacks, raop_conn_t *conn,
-                                    raop_t *raop, const char *remote, int remotelen);				    
+                                            raop_t *raop, const char *remote, int ipv6,
+                                            unsigned short port, const char *session_id);				    
 void airplay_video_service_start(airplay_video_t *airplay_video);
 void airplay_video_service_stop(airplay_video_t *airplay_video);
 void airplay_video_service_destroy(void *airplay_video);
