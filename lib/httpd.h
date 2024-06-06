@@ -38,6 +38,7 @@ typedef struct httpd_callbacks_s httpd_callbacks_t;
 
 int httpd_set_connection_type (httpd_t *http, void *user_data, connection_type_t type);
 int httpd_count_connection_type (httpd_t *http, connection_type_t type);
+int httpd_get_connection_socket (httpd_t *httpd, void *user_data);
 
 httpd_t *httpd_init(logger_t *logger, httpd_callbacks_t *callbacks, int  nohold);
 

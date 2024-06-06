@@ -81,7 +81,8 @@ struct raop_conn_s {
     raop_rtp_mirror_t *raop_rtp_mirror;
     fairplay_t *fairplay;
     pairing_session_t *session;
-
+    airplay_video_t *airplay_video;
+  
     unsigned char *local;
     int locallen;
 
@@ -94,8 +95,6 @@ struct raop_conn_s {
 
     char *client_session_id;
 
-    void *airplay_video;
-  
     bool have_active_remote;
 };
 typedef struct raop_conn_s raop_conn_t;
@@ -394,7 +393,6 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     }
 }
 
-void airplay_video_service_destroy(void * airplay_video);
 static void
 conn_destroy(void *ptr) {
     raop_conn_t *conn = ptr;

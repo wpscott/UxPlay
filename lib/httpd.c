@@ -58,6 +58,20 @@ struct httpd_s {
 };
 
 int
+httpd_get_connection_socket (httpd_t *httpd, void *user_data) {
+    for (int i = 0; i < httpd->max_connections; i++) {
+        http_connection_t *connection = &httpd->connections[i];
+	if (!connection->connected) {
+            continue;
+        }
+        if (connection->user_data == user_data) {
+            return connection->socket_fd;
+        }
+    }
+    return -1;
+}
+
+int
 httpd_set_connection_type (httpd_t *httpd, void *user_data, connection_type_t type) {
     for (int i = 0; i < httpd->max_connections; i++) {
         http_connection_t *connection = &httpd->connections[i];

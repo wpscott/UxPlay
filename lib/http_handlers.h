@@ -46,28 +46,23 @@ http_handler_server_info(raop_conn_t *conn, http_request_t *request, http_respon
 
     assert(*response_datalen == strlen(*response_data));
 
-    /* this code removes the final '/n' in the xml plist textstring: is it necessary? */
-    (*response_data)[*response_datalen] = '\0';
-    (*response_datalen)--;
+    /* apsdk removes the final '/n' in the xml plist textstring: is it necessary? */
+    // (*response_data)[*response_datalen] = '\0';
+    // (*response_datalen)--;
     
     plist_free(r_node);
     http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
     free(hw_addr);
 
-    char remote[40];
-    int len = utils_ipaddress_to_string(conn->remotelen, conn->remote, conn->zone_id, remote, (int) sizeof(remote));
-    if (!len || len > sizeof(remote)) {
-        char *str = utils_data_to_string(conn->remote, conn->remotelen, 16);
-        logger_log(conn->raop->logger, LOGGER_ERR, "failed to extract valid client ip address:\n"
-                   "*** UxPlay will be unable to send communications to client.\n"
-                   "*** address length %d, zone_id %u address data:\n%sparser returned \"%s\"\n",
-                   conn->remotelen, conn->zone_id, str, remote);
-         free(str);
+    int socket_fd = httpd_get_connection_socket (conn->raop->httpd, (void *) conn);
+    if (socket_fd < 0) {
+        logger_log(conn->raop->logger, LOGGER_ERR, "faied to retrieve socket_fd from httpd");
     }
-    int ipv6 = (conn->remotelen == 16 ? 1: 0);
+
+    /* initialize the aiplay video service */
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
-    conn->airplay_video =  (void *) airplay_video_service_init(conn->raop->logger, &conn->raop->callbacks, conn,
-                                                               conn->raop, remote, ipv6, conn->raop->port, session_id);
+    conn->airplay_video =  (void *) airplay_video_service_init(conn->raop->logger, &(conn->raop->callbacks), conn,
+                                                               conn->raop, socket_fd, conn->raop->port, session_id);
 
 }
 
@@ -111,7 +106,7 @@ http_handler_scrub(raop_conn_t *conn, http_request_t *request, http_response_t *
     }
 
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
-    airplay_video_scrub(session_id, scrub_position);
+    airplay_video_scrub(conn->airplay_video, session_id, scrub_position);
 }
 
 static void
@@ -133,16 +128,16 @@ http_handler_rate(raop_conn_t *conn, http_request_t *request, http_response_t *r
     }
 
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
-    airplay_video_rate(session_id, rate_value);
+    airplay_video_rate(conn->airplay_video, session_id, rate_value);
 }
 
 static void
 http_handler_stop(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                   char **response_data, int *response_datalen) {
     logger_log(conn->raop->logger, LOGGER_INFO, "client HTTP request POST stop");
-    airplay_media_reset();
+    airplay_media_reset(conn->airplay_video);
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
-    airplay_video_stop(session_id);
+    airplay_video_stop(conn->airplay_video, session_id);
 }
 
 static void
@@ -253,13 +248,13 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
     plist_get_uint_val(plist_fcup_response_requestid_node, &uint_val);
     request_id = (int) uint_val;
     
-    char *location = airplay_process_media(fcup_response_url, fcup_response_data, fcup_response_datalen, request_id); 
+    char *location = airplay_process_media(conn->airplay_video, fcup_response_url, fcup_response_data, fcup_response_datalen, request_id); 
     
     /* play, if location != NULL */
     if (location) {
       const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
       double position_in_secs = 0.0;
-      airplay_video_play(session_id, location, position_in_secs);
+      airplay_video_play(conn->airplay_video, session_id, location, position_in_secs);
     }
     
  finish:
@@ -300,7 +295,8 @@ http_handler_playback_info(raop_conn_t *conn,
 {
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_playback_info");
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
-    playback_info_t *playback_info = airplay_video_acquire_playback_info(session_id);
+
+    playback_info_t *playback_info = airplay_video_acquire_playback_info(conn->airplay_video, session_id);
   
     plist_t res_root_node = plist_new_dict();
 
@@ -325,35 +321,33 @@ http_handler_playback_info(raop_conn_t *conn,
     plist_t playback_likely_to_keep_up_node = plist_new_uint(playback_info->playbackLikelyToKeepUp);
     plist_dict_set_item(res_root_node, "playbackLikelyToKeepUp", playback_likely_to_keep_up_node);
 
-    /* get_loaded_time_range(count) returns NULL when count exceeds number of loaded time_ranges */
     plist_t loaded_time_ranges_node = plist_new_array();
-    int count_loaded = 0;
-    time_range_t *loaded_time_range = get_loaded_time_range(count_loaded);
-    while (loaded_time_range) {
-      plist_t time_range_node = plist_new_dict();
-      plist_t duration_node = plist_new_real(loaded_time_range->duration);
-      plist_dict_set_item(time_range_node, "duration", duration_node);
-      plist_t start_node = plist_new_real(loaded_time_range->start);
-      plist_dict_set_item(time_range_node, "start", start_node);
-      plist_array_append_item(loaded_time_ranges_node, time_range_node);
-      count_loaded++;
-      loaded_time_range = get_loaded_time_range(count_loaded);
+    for (int i = 0 ; i < playback_info->loadedTimeRanges; i++) {
+        time_range_t *time_range = get_loaded_time_range(conn->airplay_video, session_id, i);
+        if (time_range == NULL) {
+            continue;
+	}
+        plist_t time_range_node = plist_new_dict();
+        plist_t duration_node = plist_new_real(time_range->duration);
+        plist_dict_set_item(time_range_node, "duration", duration_node);
+        plist_t start_node = plist_new_real(time_range->start);
+        plist_dict_set_item(time_range_node, "start", start_node);
+        plist_array_append_item(loaded_time_ranges_node, time_range_node);
     }
     plist_dict_set_item(res_root_node, "loadedTimeRanges", loaded_time_ranges_node);
 
-    /* get_seekable_time_range(count) returns NULL when count exceeds number of seekable time_ranges */
     plist_t seekable_time_ranges_node = plist_new_array();
-    int count_seekable = 0;
-    time_range_t *seekable_time_range = get_seekable_time_range(count_seekable);
-    while (seekable_time_range) {
-      plist_t time_range_node = plist_new_dict();
-      plist_t duration_node = plist_new_real(seekable_time_range->duration);
-      plist_dict_set_item(time_range_node, "duration", duration_node);
-      plist_t start_node = plist_new_real(seekable_time_range->start);
-      plist_dict_set_item(time_range_node, "start", start_node);
-      plist_array_append_item(seekable_time_ranges_node, time_range_node);
-      count_seekable++;
-      seekable_time_range = get_seekable_time_range(count_seekable);
+    for (int i = 0 ; i < playback_info->seekableTimeRanges; i++) {
+        time_range_t *time_range = get_seekable_time_range(conn->airplay_video, session_id, i);
+        if (time_range == NULL) {
+            continue;
+	}
+        plist_t time_range_node = plist_new_dict();
+        plist_t duration_node = plist_new_real(time_range->duration);
+        plist_dict_set_item(time_range_node, "duration", duration_node);
+        plist_t start_node = plist_new_real(time_range->start);
+        plist_dict_set_item(time_range_node, "start", start_node);
+        plist_array_append_item(seekable_time_ranges_node, time_range_node);
     }
     plist_dict_set_item(res_root_node, "seekableTimeRanges", seekable_time_ranges_node);
     
@@ -369,8 +363,10 @@ http_handler_get_generic(raop_conn_t *conn,
                       http_request_t *request, http_response_t *response,
 			  char **response_data, int *response_datalen) {
     const char *url = http_request_get_url(request);
-    *response_datalen  =  query_media_data(url, response_data);
+    *response_datalen  =  query_media_data(conn->airplay_video, url, response_data);
     http_response_add_header(response, "Content-Type", "application/x-mpegURL; charset=utf-8");
+  
+    // tis is 
 }
 
 static void
@@ -471,7 +467,7 @@ http_handler_play(raop_conn_t *conn,
         }
     }
 
-    airplay_video_play(session_id, playback_location, start_position);
+    airplay_video_play(conn->airplay_video, session_id, playback_location, start_position);
     if (req_root_node) {
       plist_free(req_root_node);
     }
