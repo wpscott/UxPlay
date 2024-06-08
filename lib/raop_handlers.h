@@ -195,7 +195,6 @@ raop_handler_pairpinstart(raop_conn_t *conn,
     logger_log(conn->raop->logger, LOGGER_INFO, "*** CLIENT MUST NOW ENTER PIN = \"%s\" AS AIRPLAY PASSWORD", pin);
     *response_data = NULL;
     response_datalen = 0;
-    return;
 }
 
 static void
@@ -354,10 +353,8 @@ raop_handler_pairsetup_pin(raop_conn_t *conn,
 	return;
     }
  authentication_failed:;
-    response = http_response_revise(response, 470, "Client Authentication Failure");
-    *response_data = NULL;
-    response_datalen = 0;
-    return;
+    http_response_destroy(response);
+    response = http_response_init("RTSP/1.0", 470, "Client Authentication Failure");
 }
 
 static void

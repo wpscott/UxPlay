@@ -22,44 +22,18 @@
 #include "raop.h"
 #include "logger.h"
 
-
-typedef struct time_range_s {
-    double start;
-    double duration;
-} time_range_t;
-
 typedef struct airplay_video_s airplay_video_t;
 
 
-
-typedef struct playback_info_s {
-    char * uuid;
-    uint32_t stallCount;
-    double duration;
-    float position;
-    double rate;
-    bool readyToPlay;
-    bool playbackBufferEmpty;
-    bool playbackBufferFull;
-    bool playbackLikelyToKeepUp;
-    int loadedTimeRanges;
-    int seekableTimeRanges;
-} playback_info_t;
-
-
-playback_info_t *airplay_video_acquire_playback_info(airplay_video_t *airplay_video, const char *session_id);
+int airplay_video_acquire_playback_info(airplay_video_t *airplay_video, const char *session_id, char **plist_xml);
 void airplay_media_reset(airplay_video_t *airplay_video);
 void airplay_video_stop(airplay_video_t *airplay_video, const char *session_id);
 void airplay_video_rate(airplay_video_t *airplay_video, const char *session_id, double rate);
-void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, char *location, double start_position);
+void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, const char *location, double start_position);
 void airplay_video_scrub(airplay_video_t *airplay_video, const char *session_id, double scrub_position);
 int query_media_data(airplay_video_t *airplay_video, const char *url, char **response_data);
 char *airplay_process_media(airplay_video_t *airplay_video, char *fcup_response_url, char *fcup_response_data,
                             int fcup_response_datalen, int request_id);
-
-time_range_t *get_loaded_time_range(airplay_video_t * airplay_video, const char *session_id, int i);
-time_range_t *get_seekable_time_range(airplay_video_t * airplay_video, const char *session_id, int i);
-
 
 void airplay_video_service_start(airplay_video_t *airplay_video);
 void airplay_video_service_stop(airplay_video_t *airplay_video);

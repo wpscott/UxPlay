@@ -2,10 +2,9 @@
 
 static void
 http_handler_server_info(raop_conn_t *conn, http_request_t *request, http_response_t *response,
-                            char **response_data, int *response_datalen)  {
+                         char **response_data, int *response_datalen)  {
 
     assert(conn->raop->dnssd);
-
     int hw_addr_raw_len = 0;
     const char *hw_addr_raw = dnssd_get_hw_addr(conn->raop->dnssd, &hw_addr_raw_len);
 
@@ -39,28 +38,26 @@ http_handler_server_info(raop_conn_t *conn, http_request_t *request, http_respon
     plist_t device_id_node = plist_new_string(hw_addr);
     plist_dict_set_item(r_node, "deviceid", device_id_node);
 
-
     plist_to_xml(r_node, response_data, (uint32_t *) response_datalen);
 
-    /* last 2 characters in *response_data are '>' and 0x0a  (/n). (followed by '\0') */
+    //assert(*response_datalen == strlen(*response_data));
 
-    assert(*response_datalen == strlen(*response_data));
-
-    /* apsdk removes the final '/n' in the xml plist textstring: is it necessary? */
-    // (*response_data)[*response_datalen] = '\0';
-    // (*response_datalen)--;
+    /* last character (at *response_data[response_datalen - 1]) is  0x0a = '\n'
+     * (*response_data[response_datalen] is '\0').
+     * apsdk removes the last "\n" by overwriting it with '\0', and reducing response_datalen by 1. 
+     * TODO: check if this is necessary  */
     
     plist_free(r_node);
     http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
     free(hw_addr);
-
     int socket_fd = httpd_get_connection_socket (conn->raop->httpd, (void *) conn);
     if (socket_fd < 0) {
         logger_log(conn->raop->logger, LOGGER_ERR, "faied to retrieve socket_fd from httpd");
     }
-
+    
     /* initialize the aiplay video service */
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
+
     conn->airplay_video =  (void *) airplay_video_service_init(conn->raop->logger, &(conn->raop->callbacks), conn,
                                                                conn->raop, socket_fd, conn->raop->port, session_id);
 
@@ -69,23 +66,22 @@ http_handler_server_info(raop_conn_t *conn, http_request_t *request, http_respon
 static void
 http_handler_get_property(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                           char **response_data, int *response_datalen) {
-  const char *url = http_request_get_url(request);
-  const char *property = strstr(url, "/setProperty?") + 1;
-  logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_get_property: %s (unhandled)", property);
+    const char *url = http_request_get_url(request);
+    const char *property = strstr(url, "/setProperty?") + 1;
+    logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_get_property: %s (unhandled)", property);
 }
 
 static void
 http_handler_reverse(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                      char **response_data, int *response_datalen) {
 
-    const char *purpose = http_request_get_header(request, "X-Apple-Session-Purpose");
+    const char *purpose = http_request_get_header(request, "X-Apple-Purpose");
     const char *connection = http_request_get_header(request, "Connection");
     const char *upgrade = http_request_get_header(request, "Upgrade");
     logger_log(conn->raop->logger, LOGGER_INFO, "client requested reverse connection: %s; purpose: %s  \"%s\"",
-        connection, upgrade, purpose);
-    http_response_add_header(response, "Connection", connection);
-    http_response_add_header(response, "Upgrade", upgrade);
-    http_response_revise(response, 101, "Switching Protocols");
+               connection, upgrade, purpose);
+    http_response_destroy(response);
+    response = http_response_init("HTTP/1.1", 101, "Switching Protocols");
 }
 
 static void
@@ -269,7 +265,8 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
     return;
 
  post_action_error:;
-    http_response_revise(response, 400, "Bad Request");
+    http_response_destroy(response);
+    response = http_response_init("HTTP/1.1", 400, "Bad Request");
 
     if (req_root_node)  {
       plist_free(req_root_node);
@@ -284,7 +281,8 @@ http_handler_fpsetup2(raop_conn_t *conn, http_request_t *request, http_response_
     int req_datalen;
     const unsigned char *req_data = (unsigned char *) http_request_get_data(request, &req_datalen);
     logger_log(conn->raop->logger, LOGGER_ERR, "only FairPlay version 0x03 is implemented, version is 0x%2.2x", req_data[4]);
-    http_response_revise(response, 421, "Misdirected Request");
+    http_response_destroy(response);
+    response = http_response_init("HTTP/1.1", 421, "Misdirected Request");
 }
 
 
@@ -295,67 +293,15 @@ http_handler_playback_info(raop_conn_t *conn,
 {
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_playback_info");
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
-
-    playback_info_t *playback_info = airplay_video_acquire_playback_info(conn->airplay_video, session_id);
-  
-    plist_t res_root_node = plist_new_dict();
-
-    plist_t duration_node = plist_new_real(playback_info->duration);
-    plist_dict_set_item(res_root_node, "duration", duration_node);
-
-    plist_t position_node = plist_new_real(playback_info->position);
-    plist_dict_set_item(res_root_node, "position", position_node);
-
-    plist_t rate_node = plist_new_real(playback_info->rate);
-    plist_dict_set_item(res_root_node, "rate", rate_node);
-
-    plist_t ready_to_play_node = plist_new_uint(playback_info->readyToPlay);
-    plist_dict_set_item(res_root_node, "readyToPlay", ready_to_play_node);
-
-    plist_t playback_buffer_empty_node = plist_new_uint(playback_info->playbackBufferEmpty);
-    plist_dict_set_item(res_root_node, "playbackBufferEmpty", playback_buffer_empty_node);
-
-    plist_t playback_buffer_full_node = plist_new_uint(playback_info->playbackBufferFull);
-    plist_dict_set_item(res_root_node, "playbackBufferFull", playback_buffer_full_node);
-
-    plist_t playback_likely_to_keep_up_node = plist_new_uint(playback_info->playbackLikelyToKeepUp);
-    plist_dict_set_item(res_root_node, "playbackLikelyToKeepUp", playback_likely_to_keep_up_node);
-
-    plist_t loaded_time_ranges_node = plist_new_array();
-    for (int i = 0 ; i < playback_info->loadedTimeRanges; i++) {
-        time_range_t *time_range = get_loaded_time_range(conn->airplay_video, session_id, i);
-        if (time_range == NULL) {
-            continue;
-	}
-        plist_t time_range_node = plist_new_dict();
-        plist_t duration_node = plist_new_real(time_range->duration);
-        plist_dict_set_item(time_range_node, "duration", duration_node);
-        plist_t start_node = plist_new_real(time_range->start);
-        plist_dict_set_item(time_range_node, "start", start_node);
-        plist_array_append_item(loaded_time_ranges_node, time_range_node);
-    }
-    plist_dict_set_item(res_root_node, "loadedTimeRanges", loaded_time_ranges_node);
-
-    plist_t seekable_time_ranges_node = plist_new_array();
-    for (int i = 0 ; i < playback_info->seekableTimeRanges; i++) {
-        time_range_t *time_range = get_seekable_time_range(conn->airplay_video, session_id, i);
-        if (time_range == NULL) {
-            continue;
-	}
-        plist_t time_range_node = plist_new_dict();
-        plist_t duration_node = plist_new_real(time_range->duration);
-        plist_dict_set_item(time_range_node, "duration", duration_node);
-        plist_t start_node = plist_new_real(time_range->start);
-        plist_dict_set_item(time_range_node, "start", start_node);
-        plist_array_append_item(seekable_time_ranges_node, time_range_node);
-    }
-    plist_dict_set_item(res_root_node, "seekableTimeRanges", seekable_time_ranges_node);
     
-    plist_to_xml(res_root_node, response_data, (uint32_t *) response_datalen);
-    plist_free(res_root_node);
-    http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
+    *response_datalen  =  airplay_video_acquire_playback_info(conn->airplay_video, session_id, response_data);
 
-   /* last 2 characters in *response_data are '>' and 0x0a  (/n). (followed by '\0') */
+    /* last character (at *response_data[response_datalen - 1]) is  0x0a = '\n'
+     * (*response_data[response_datalen] is '\0').
+     * apsdk removes the last "\n" by overwriting it with '\0', and reducing response_datalen by 1. 
+     * TODO: check if this is necessary  */
+
+    http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
 }
 
 static void
@@ -365,8 +311,8 @@ http_handler_get_generic(raop_conn_t *conn,
     const char *url = http_request_get_url(request);
     *response_datalen  =  query_media_data(conn->airplay_video, url, response_data);
     http_response_add_header(response, "Content-Type", "application/x-mpegURL; charset=utf-8");
-  
-    // tis is 
+    logger_log(conn->raop->logger, LOGGER_ERR, "http_handler_get_generic is incomplete");
+    assert(0);   
 }
 
 static void
@@ -471,13 +417,13 @@ http_handler_play(raop_conn_t *conn,
     if (req_root_node) {
       plist_free(req_root_node);
     }
-    
+    return;
+
  play_error:;
     if (req_root_node) {
       plist_free(req_root_node);
     }
     logger_log(conn->raop->logger, LOGGER_ERR, "Couldn't find valid Plist Data for /play, Unhandled");
-    response = http_response_revise(response, 400, "Bad Request");
-    return;
+    http_response_destroy(response);
+    response = http_response_init("HTTP/1.1", 400, "Bad Request");
 }
-
