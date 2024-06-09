@@ -54,7 +54,6 @@ http_response_add_data(http_response_t *response, const char *data, int datalen)
 http_response_t *
 http_response_init(const char *protocol, int code, const char *message)
 {
-    http_response_t *response;
     char codestr[4];
 
     assert(code >= 100 && code < 1000);
@@ -62,7 +61,13 @@ http_response_init(const char *protocol, int code, const char *message)
     /* Convert code into string */
     memset(codestr, 0, sizeof(codestr));
     snprintf(codestr, sizeof(codestr), "%u", code);
+    return http_response_init_with_codestr(protocol, codestr, message);
+}
 
+http_response_t *
+http_response_init_with_codestr(const char *protocol, const char *codestr, const char *message)
+{
+    http_response_t *response;    
     response = calloc(1, sizeof(http_response_t));
     if (!response) {
         return NULL;
