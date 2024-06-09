@@ -364,7 +364,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     header_str =  utils_data_to_text(data, len);
     logger_log(conn->raop->logger, LOGGER_DEBUG, "\n%s", header_str);
     bool data_is_plist = (strstr(header_str,"apple-binary-plist") != NULL);
-    bool data_is_text = (strstr(header_str,"text/parameters") != NULL);
+    bool data_is_text = (strstr(header_str,"text/") != NULL);
     free(header_str);
     if (response_data) {
         if (response_datalen > 0 && logger_debug) {

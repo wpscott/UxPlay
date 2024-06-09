@@ -28,13 +28,6 @@
 #include <plist/plist.h>
 //#include <gst/gst.h>
 
-#ifdef _WIN32
-#define CAST (char *)
-#else
-#define CAST
-#endif
-
-
 
 #include "raop.h"
 #include "threads.h"
@@ -42,7 +35,8 @@
 #include "netutils.h"
 #include "byteutils.h"
 #include "utils.h"
-
+#include "http_response.h"
+#include "airplay_video.h"
 
 #define MAX_TIME_RANGES 10
 
@@ -73,6 +67,7 @@ struct airplay_video_s {
     raop_callbacks_t callbacks;
     raop_t *conn;
     char *session_id;
+    int request_id;
     char *hls_prefix;
     char *playback_location;
     playback_info_t *playback_info;
@@ -94,6 +89,70 @@ struct airplay_video_s {
     int running;
     int joined;
 };
+
+static
+void send_fcup_request(airplay_video_t *airplay_video, const char *url) {
+    /* values taken from apsdk-public;  */
+  
+    /* these seem to be arbitrary choices */
+    const int sessionID = 1;
+    const int FCUP_Response_ClientInfo = 1;
+    const int FCUP_Response_ClientRef = 40030004;
+
+    /* taken from a working AppleTV? */
+    const char User_Agent[] = "AppleCoreMedia/1.0.0.11B554a (Apple TV; U; CPU OS 7_0_4 like Mac OS X; en_us";
+
+    plist_t session_id_node = plist_new_int((int64_t) sessionID);
+    plist_t type_node = plist_new_string("unhandledURLRequest");
+    plist_t client_info_node = plist_new_int(FCUP_Response_ClientInfo);
+    plist_t client_ref_node = plist_new_int((int64_t) FCUP_Response_ClientRef);
+    plist_t request_id_node = plist_new_int((int64_t) (airplay_video->request_id)++);
+    plist_t url_node = plist_new_string(url);
+    plist_t playback_session_id_node = plist_new_string(airplay_video->session_id);
+    plist_t user_agent_node = plist_new_string(User_Agent);
+    
+    plist_t req_root_node = plist_new_dict();
+    plist_dict_set_item(req_root_node, "sessionID", session_id_node);
+    plist_dict_set_item(req_root_node, "type", type_node);
+
+    plist_t fcup_request_node = plist_new_dict();
+    plist_dict_set_item(fcup_request_node, "FCUP_Response_ClientInfo", client_info_node);
+    plist_dict_set_item(fcup_request_node, "FCUP_Response_ClientRef", client_ref_node);
+    plist_dict_set_item(fcup_request_node, "FCUP_Response_RequestID", request_id_node);
+    plist_dict_set_item(fcup_request_node, "FCUP_Response_URL", url_node);
+    plist_dict_set_item(fcup_request_node, "SessionID", session_id_node);
+				    
+    plist_t fcup_response_header_node = plist_new_dict;
+    plist_dict_set_item(fcup_response_header_node, "X-Playback-Session-ID", playback_session_id_node);
+    plist_dict_set_item(fcup_response_header_node, "User-Agent", user_agent_node);
+
+    plist_dict_set_item(fcup_request_node, "FCUP_Response_Header", fcup_response_header_node);
+    plist_dict_set_item(req_root_node, "request", fcup_request_node);
+    
+    uint32_t uint_val;
+    char *plist_xml;
+    plist_to_xml(req_root_node, &plist_xml, &uint_val);
+    int datalen = (int) uint_val;
+			  
+    /* use tools for creating http responses to create the reverse http request */
+    http_response_t *request = http_response_init_with_codestr("POST", "/event", "HTTP/1.1");
+    http_response_add_header(request, "X-Apple-Session-ID", airplay_video->session_id);
+    http_response_add_header(request, "Content-Type", "text/x-apple-plist+xml");
+    http_response_finish(request, plist_xml, datalen);
+    
+    int len;
+    const char *reverse_request = http_response_get_data(request, &len);
+    logger_log(airplay_video->logger, LOGGER_DEBUG, "%s", reverse_request);
+    int send_len = send(airplay_video->rsock, reverse_request, len, 0);
+    if (send_len < 0) {
+        int sock_err = SOCKET_GET_ERROR();
+        logger_log(airplay_video->logger, LOGGER_ERR, "airplay_video error sending request. Error %d:%s",
+                   sock_err, strerror(sock_err));
+    }
+   
+    plist_free(req_root_node);   
+    free (plist_xml);
+}
 
 
 static playback_info_t playback_info_static;
@@ -144,13 +203,19 @@ int set_playback_info_item(playback_info_t *playback_info, const char *item, dou
  *    Replace "loaded" by "seekable" for handling a seekableTimeRange.
  */
 
-int add_playback_info_time_range(playback_info_t *playback_info, const char *item, double duration, double start) {
+
+// this adds a time range (duration, start) of time-range_type = "loadedTimeRange" or "seekableTimeRange"
+// to the playback info struc, and increments the appropiate counter by 1.  Not more than
+// MAX_TIME_RANGES of a give typen may be added.
+// returns 0 for success, -1 for failure.
+
+int add_playback_info_time_range(playback_info_t *playback_info, const char *time_range_type, double duration, double start) {
     time_range_t *time_range;
     int *time_range_num;
-    if (!strstr(item, "loadedTimeRange")) {
+    if (!strstr(time_range_type, "loadedTimeRange")) {
         time_range_num = &playback_info->num_loaded_time_ranges;
         time_range = (time_range_t *) &playback_info->loadedTimeRanges[*time_range_num];
-    } else if (!strstr(item, "seekableTimeRange")) {
+    } else if (!strstr(time_range_type, "seekableTimeRange")) {
         time_range_num = &playback_info->num_seekable_time_ranges;
         time_range = (time_range_t *) &playback_info->seekableTimeRanges[*time_range_num];
     } else {
@@ -166,6 +231,9 @@ int add_playback_info_time_range(playback_info_t *playback_info, const char *ite
     return 0;
 }
 
+
+// this allows the entries in playback_info to be updated.
+
 static
 void initialize_playback_info(airplay_video_t *airplay_video) {
     int ret = 0;  
@@ -179,15 +247,17 @@ void initialize_playback_info(airplay_video_t *airplay_video) {
     ret += set_playback_info_item(playback_info, "playbackLikelyToKeepUp", 1);
     ret += set_playback_info_item(playback_info, "loadedTimeRanges", 0);
     ret += set_playback_info_item(playback_info, "seekableTimeRanges", 0);
-    printf("%d %d\n",playback_info->num_loaded_time_ranges, playback_info->num_seekable_time_ranges); 
 
-    ret += add_playback_info_time_range(playback_info, "seekableTimeRange", 0.3,  0.3);
+    // for testing time_range code
+    //ret += add_playback_info_time_range(playback_info, "seekableTimeRange", 0.3,  0.3);
 
     if (ret) {
           logger_log(airplay_video->logger, LOGGER_ERR, "initialize_playback_info error");
     }
 }
 
+
+// called by http_handler_playback_info to respond to a GET /playback_info request from the client.
 
 int airplay_video_acquire_playback_info(airplay_video_t *airplay_video, const char *session_id, char **plist_xml) {
 
@@ -248,10 +318,11 @@ int airplay_video_acquire_playback_info(airplay_video_t *airplay_video, const ch
     uint32_t len;
     plist_to_xml(res_root_node, plist_xml, &len);
     plist_free(res_root_node);
-
     return (int) len;
 }
 
+
+// a thread for the airplay_video server, (may not be necessary, but included in case it is)
 
 static THREAD_RETVAL
 airplay_video_thread(void *arg)
@@ -290,11 +361,12 @@ airplay_video_thread(void *arg)
 }
 
 
+//  initialize airplay_video service.
 
 airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *callbacks, void *conn,
                                             raop_t *raop, int rsock, unsigned short port, const char *session_id) {
 
-
+  printf("video_service_init\n");
     assert(logger);
     assert(callbacks);
     assert(conn);
@@ -305,6 +377,10 @@ airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *
     }
 
     initialize_playback_info(airplay_video);
+    //    char *plist_xml;
+    //airplay_video_acquire_playback_info(airplay_video, "session_id", &plist_xml);   
+    //printf("%s\n", plist_xml);
+    //free (plist_xml);
       
     airplay_video->logger = logger;
     memcpy(&airplay_video->callbacks, callbacks, sizeof(raop_callbacks_t));
@@ -317,19 +393,20 @@ airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *
 
     size_t len = strlen(session_id);
     airplay_video->session_id = (char *) malloc(len + 1);
+    airplay_video->request_id = 0;
     strncpy(airplay_video->session_id, session_id, len);
     (airplay_video->session_id)[len] = '\0';
     
     /* port is needed for address of HLS data */
-    char port_str[12] = { '\0' };
+    char port_str[12] = { 0 };
     snprintf(port_str, sizeof(port_str),"%u", port);
     char prefix[] = "http://localhost:";
-    len = strlen(prefix) + strlen(port_str);
-    airplay_video->hls_prefix = (char *) malloc(len + 1);
+    len = strlen(prefix) + strlen(port_str) + 1;
+    airplay_video->hls_prefix = (char *) malloc(len);
     snprintf(airplay_video->hls_prefix, len, "%s%s", prefix, port_str);
     (airplay_video->hls_prefix)[len] = '\0';
-    airplay_video->playback_location = NULL;
 
+    airplay_video->playback_location = NULL;
     airplay_video->running = 0;
     airplay_video->joined = 1;
 
@@ -340,6 +417,8 @@ airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *
     return airplay_video;
 }
 
+
+// start the already-initialized airplay_video service by  creating a thread
 void
 airplay_video_service_start(airplay_video_t *airplay_video)
 {
@@ -360,6 +439,7 @@ airplay_video_service_start(airplay_video_t *airplay_video)
     MUTEX_UNLOCK(airplay_video->run_mutex);
 }
 
+//stop the airplay_video thread
 void
 airplay_video_service_stop(airplay_video_t *airplay_video)
 {
@@ -397,6 +477,7 @@ airplay_video_service_stop(airplay_video_t *airplay_video)
     MUTEX_UNLOCK(airplay_video->run_mutex);
 }
 
+// destroy the airplay_video service
 void
 airplay_video_service_destroy(airplay_video_t *airplay_video)
 {
@@ -418,7 +499,10 @@ airplay_video_service_destroy(airplay_video_t *airplay_video)
 }
 
 
-
+// store an adjusted playback_location as airplay_video->plaback location.
+// the adjustment replaced schemes mlhls (YouTube) or nfhls (NetFlix) by http,
+// and replaces domain addresses  "localhost" or "127.0.0.1" (loopback)  by
+// "localhost:xxxxx" where xxxxx (e.g. 39891) is the server port used for receiving HLS data.
 static
 int store_playback_location(airplay_video_t *airplay_video, const char *playback_location) {
     /* reforms the HLS location */
@@ -439,30 +523,34 @@ int store_playback_location(airplay_video_t *airplay_video, const char *playback
             logger_log(airplay_video->logger, LOGGER_ERR, "(expecting localhost or 127.0.0.1 as domain)");
             return -1;
         }
-        size_t len = strlen(airplay_video->hls_prefix) + strlen(address);
-        if (airplay_video->playback_location) {
-            free(airplay_video->playback_location);
-        }
-        airplay_video->playback_location = (char *) malloc(len + 1);
-        snprintf(airplay_video->playback_location, len, "%s%s", airplay_video->hls_prefix, address);
-        (airplay_video->playback_location)[len] = '\0';
-        logger_log(airplay_video->logger, LOGGER_DEBUG, "adjusted playback_location \"%s\"", airplay_video->playback_location);
     }
+
+    size_t len = strlen(airplay_video->hls_prefix) + strlen(address) + 1;
+    if (airplay_video->playback_location) {
+      free(airplay_video->playback_location);
+    }
+    airplay_video->playback_location = (char *) malloc(len);
+    snprintf(airplay_video->playback_location, len, "%s%s", airplay_video->hls_prefix, address);
+    (airplay_video->playback_location)[len] = '\0';
+    logger_log(airplay_video->logger, LOGGER_DEBUG, "adjusted playback_location \"%s\"", airplay_video->playback_location);
     return 0;
 }
 
 /* partially implemented */
+/* call to handle the "POST /play" request from client.*/
 
 void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, const char *location, double start_position) {
 
+  printf("airplay_video_play\n");
+  
   if (!store_playback_location(airplay_video, location)) {
-     // need to add gstreamer in lib/CMakeLIsts.tx to use gLib;
+     // need to add gstreamer in lib/CMakeLIsts.txt to use gLib;
      //GString *command = g_string_new("nohup gst-launch-1.0 playbin uri=");
      //gstring_append(command, airplay_video->playback_location);
      //gstring_append(command, " &");
      char play_cmd[] = "nohup gst-launch-1.0 playbin uri=";
      size_t len = strlen(play_cmd) + strlen(airplay_video->playback_location) + 3;
-     char *command = (char *) malloc(len);
+     char *command = (char *) calloc(len, sizeof(char));
      strncat(command, play_cmd, len);
      strncat(command, airplay_video->playback_location, len);
      strncat(command, " &", len);
@@ -477,28 +565,39 @@ void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, 
 
 /* unimplemented */
 
+// corresponds to casting_media_data_store:: reset
+
 void airplay_media_reset(airplay_video_t *airplay_video) {
 
 }
 
+// handles POST /stop requests
+// corresponds to on_video_sto
 void airplay_video_stop(airplay_video_t *airplay_video, const char *session_id) {
 
 }
 
+
+// handles "POST /rate" requests
+// equivalen code is service/casting_media_data_store: pro
 void airplay_video_rate(airplay_video_t *airplay_video, const char *session_id, double rate) {
 
 }
 
 
+//handles "POST /scrub" reuests
 void airplay_video_scrub( airplay_video_t *airplay_video, const char *session_id, double scrub_position) {
 
 }
 
 
+// t equivalent aspdk code is in service/casting_media_data_store: process_media_data
 int query_media_data(airplay_video_t *airplay_video, const char *url, char **response_data) {
   return 0;
 }
 
-char *airplay_process_media(airplay_video_t *airplay_video, char *fcup_response_url, char *fcup_response_data, int fcup_response_datalen, int request_id) {
+// ths is the main  code:   equivalent aspdk code is in service/casting_media_data_store: process_media_data
+
+char *airplay_process_media_data(airplay_video_t *airplay_video, char *fcup_response_url, char *fcup_response_data, int fcup_response_datalen, int request_id) {
    return NULL;
 }

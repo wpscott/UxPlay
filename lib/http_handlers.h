@@ -244,7 +244,8 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
     plist_get_uint_val(plist_fcup_response_requestid_node, &uint_val);
     request_id = (int) uint_val;
     
-    char *location = airplay_process_media(conn->airplay_video, fcup_response_url, fcup_response_data, fcup_response_datalen, request_id); 
+    char *location = airplay_process_media_data(conn->airplay_video, fcup_response_url, fcup_response_data,
+                                                fcup_response_datalen, request_id); 
     
     /* play, if location != NULL */
     if (location) {
