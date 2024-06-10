@@ -19,13 +19,13 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
-#include <stdbool.h>
 
 #include "httpd.h"
 #include "netutils.h"
 #include "http_request.h"
 #include "compat.h"
 #include "logger.h"
+#include "utils.h"
 
 struct http_connection_s {
     int connected;
@@ -256,10 +256,11 @@ static THREAD_RETVAL
 httpd_thread(void *arg)
 {
     httpd_t *httpd = arg;
+    char http[] = "HTTP/1.1";
     char buffer[1024];
     int i;
+
     bool logger_debug = (logger_get_level(httpd->logger) >= LOGGER_DEBUG);
-    
     assert(httpd);
 
     while (1) {
@@ -267,6 +268,7 @@ httpd_thread(void *arg)
         struct timeval tv;
         int nfds=0;
         int ret;
+	int new_request;
 
         MUTEX_LOCK(httpd->run_mutex);
         if (!httpd->running) {
@@ -350,13 +352,55 @@ httpd_thread(void *arg)
             if (!connection->request) {
                 connection->request = http_request_init();
                 assert(connection->request);
-            }
+                new_request = 1;
+            } else {
+                new_request = 0;
+	    }
 
             logger_log(httpd->logger, LOGGER_DEBUG, "httpd receiving on socket %d, connection %d", connection->socket_fd, i);
-            ret = recv(connection->socket_fd, buffer, sizeof(buffer), 0);
-            if (ret == 0) {
-                logger_log(httpd->logger, LOGGER_INFO, "Connection closed for socket %d", connection->socket_fd);
-                httpd_remove_connection(httpd, connection);
+
+            /* reverse-http responses from the client must not be sent to the llhttp parser: such messages start with "HTTP/1.1" */
+            if (new_request) {
+                int readstart = 0;
+                new_request = 0;
+                while (readstart < 8) {
+                    ret = recv(connection->socket_fd, buffer + readstart, sizeof(buffer) - readstart, 0);
+                    if (ret == 0) {
+                        logger_log(httpd->logger, LOGGER_INFO, "Connection closed for socket %d", connection->socket_fd);
+                        httpd_remove_connection(httpd, connection);
+                        continue;
+                    }
+                    readstart += ret;
+                    ret = readstart;
+                }
+                if (!memcmp(buffer, http, 8)) {
+                    http_request_set_reverse(connection->request);  
+                }
+            } else {
+                ret = recv(connection->socket_fd, buffer, sizeof(buffer), 0);
+                if (ret == 0) {
+                    logger_log(httpd->logger, LOGGER_INFO, "Connection closed for socket %d", connection->socket_fd);
+                    httpd_remove_connection(httpd, connection);
+                    continue;
+                }
+            }
+
+            if (http_request_is_reverse(connection->request)) {
+                /* this is a reverse response from the client to a GET /event reverse request from the server */
+                if (logger_debug) {
+                    if (ret) {
+                        http_request_add_data(connection->request, buffer, ret);
+                    } else {
+                        int datalen = 0;
+                        const char *data = http_request_get_data(connection->request, &datalen);
+                        char *reverse_response = utils_data_to_text(data, datalen);
+                        logger_log(httpd->logger, LOGGER_INFO, "reverse-http response from client:\n%s", reverse_response);
+                        free(reverse_response);
+                    }
+                }
+                if (ret == 0) {
+                    httpd_remove_connection(httpd, connection);
+                }
                 continue;
             }
 
