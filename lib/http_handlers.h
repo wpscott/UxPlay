@@ -306,13 +306,13 @@ http_handler_playback_info(raop_conn_t *conn,
 }
 
 static void
-http_handler_get_generic(raop_conn_t *conn,
+http_handler_hls(raop_conn_t *conn,
                       http_request_t *request, http_response_t *response,
 			  char **response_data, int *response_datalen) {
     const char *url = http_request_get_url(request);
     *response_datalen  =  query_media_data(conn->airplay_video, url, response_data);
     http_response_add_header(response, "Content-Type", "application/x-mpegURL; charset=utf-8");
-    logger_log(conn->raop->logger, LOGGER_ERR, "http_handler_get_generic is incomplete");
+    logger_log(conn->raop->logger, LOGGER_ERR, "http_handler_hls is incomplete");
     assert(0);   
 }
 

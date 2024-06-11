@@ -24,7 +24,8 @@ typedef struct httpd_s httpd_t;
 typedef enum connectype_type_e {
     CONNECTION_TYPE_UNKNOWN,
     CONNECTION_TYPE_RAOP,
-    CONNECTION_TYPE_AIRPLAY
+    CONNECTION_TYPE_AIRPLAY,
+    CONNECTION_TYPE_HLS
 } connection_type_t;
 
 struct httpd_callbacks_s {

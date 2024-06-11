@@ -172,7 +172,20 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "conn_request");
     bool logger_debug = (logger_get_level(conn->raop->logger) >= LOGGER_DEBUG);
+     
+    /* 
+    All requests arriving here have been parsed by llhttp to obtain 
+    method | url | protocol (RTSP/1.0 or HTTP/1.1)
 
+    There are three types of connections supplying these requests:
+    Connections from the AirPlay client:
+    (1) type RAOP connections with CSeq seqence  header, and no X-Apple-Session-ID header
+    (2) type AIRPLAY connection with an X-Apple-Sequence-ID header and no Cseq header
+    Connections from localhost:
+    (3) type HLS internal connections from the local HLS server (gstreamer) at localhost with neither 
+        of these headers,  but a Host: localhost:[port] header.   method = GET.
+     */
+    
     const char *method = http_request_get_method(request);
 
     if (!method) {
@@ -182,7 +195,10 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     const char *url = http_request_get_url(request);
     const char *protocol = http_request_get_protocol(request);
     const char *cseq = http_request_get_header(request, "CSeq");
-
+    const char *client_session_id = http_request_get_header(request, "X-Apple-Session-ID");
+    const char *host = http_request_get_header(request, "Host");
+    bool hls_request =  (host && !cseq && !client_session_id);
+      
     
     if (conn->connection_type == CONNECTION_TYPE_UNKNOWN) {
         if (cseq && httpd_count_connection_type(conn->raop->httpd, CONNECTION_TYPE_RAOP)) {
@@ -194,10 +210,18 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         } else if (cseq) {
             httpd_set_connection_type(conn->raop->httpd, ptr, CONNECTION_TYPE_RAOP);
             conn->connection_type = CONNECTION_TYPE_RAOP;
-        } else {
+        } else if (client_session_id) {
             httpd_set_connection_type(conn->raop->httpd, ptr, CONNECTION_TYPE_AIRPLAY);
             conn->connection_type = CONNECTION_TYPE_AIRPLAY;
-        } 
+            size_t len = strlen(client_session_id) + 1;
+            conn->client_session_id = (char *) malloc(len);
+            strncpy(conn->client_session_id, client_session_id, len);	    
+        } else if (host) {
+            httpd_set_connection_type(conn->raop->httpd, ptr, CONNECTION_TYPE_HLS);
+            conn->connection_type = CONNECTION_TYPE_HLS;
+        } else {
+	  logger_log(conn->raop->logger, LOGGER_WARNING, "connection from unknown connection type");
+        }	  
     }
 
     /* this response code and message  will be modified by the handler if necessary */
@@ -249,26 +273,19 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
 
-    if (cseq) {
     /* is this really necessary? or is it obsolete? (move it to record_handler)*/
-        if (strcmp(method, "RECORD")) {
+    if (cseq && strcmp(method, "RECORD")) {
 	    http_response_add_header(*response, "Audio-Jack-Status", "connected; type=digital");
-        }
     }
 
-    if (!cseq) {
-        const char *client_session_id = http_request_get_header(request, "X-Apple-Session-ID");
-        if (!conn->client_session_id) {
-            size_t len = strlen(client_session_id) + 1;
-            conn->client_session_id = (char *) malloc(len);
-            strncpy(conn->client_session_id, client_session_id, len);
-        }
+
+    if (client_session_id) {
         assert(!strcmp(client_session_id, conn->client_session_id));
     }
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "Handling request %s with URL %s", method, url);
     raop_handler_t handler = NULL;
-    if (!strcmp(protocol, "RTSP/1.0")) {
+    if (!hls_request && !strcmp(protocol, "RTSP/1.0")) {
         if (!strcmp(method, "POST")) {
             if (!strcmp(url, "/feedback")) {
                 handler = &raop_handler_feedback;
@@ -306,7 +323,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         } else if (!strcmp(method, "TEARDOWN")) {
             handler = &raop_handler_teardown;
         }
-    } else if (!strcmp(protocol, "HTTP/1.1")) {
+    } else if (!hls_request && !strcmp(protocol, "HTTP/1.1")) {
         if (!strcmp(method, "POST")) {
             if (!strcmp(url, "/reverse")) {
                 handler = &http_handler_reverse;
@@ -330,15 +347,15 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
                 handler = &http_handler_server_info;
             } else if (!strcmp(url, "/playback-info")) {
                 handler = &http_handler_playback_info;
-            } else {
-                handler = &http_handler_get_generic;
             }
         } else if (!strcmp(method, "PUT")) {
             if (!strcmp(method, "/setProperty?")) {
                 handler = &http_handler_set_property;
             }
         }
-    }    
+    } else if (hls_request) {
+        handler = &http_handler_hls;
+    }
 
     if (handler != NULL) {
         handler(conn, request, *response, &response_data, &response_datalen);
