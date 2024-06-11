@@ -229,8 +229,8 @@ httpd_accept_connection(httpd_t *httpd, int server_fd, int is_ipv6)
     assert (local_zone_id == remote_zone_id);
     
     /* remove existing connections to make way for new connections, if http->nohold is set:
-     * this will only occur if open_connections >= 2  and a connection with CONNECTION_TYPE_RAOP already exists */
-    if (httpd->nohold && httpd->open_connections >= 2)  {
+     * this will only occur if open_connections >= 1  and a connection with CONNECTION_TYPE_RAOP already exists */
+    if (httpd->nohold && httpd->open_connections)  {
       if (httpd_count_connection_type(httpd, CONNECTION_TYPE_RAOP)) {
             logger_log(httpd->logger, LOGGER_INFO, "Destroying current connections to allow connection by new client");
             for (int i = 0; i<httpd->max_connections; i++) {
