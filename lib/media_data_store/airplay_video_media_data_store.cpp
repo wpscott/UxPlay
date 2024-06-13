@@ -27,7 +27,7 @@
 
 #include  "../hlsparse/hlsparse.h"
 #include  "airplay_video_media_data_store.h"
-#include "utils.h"
+//#include "utils.h"
 
 #include <plist/plist.h>
 #include "../http_response.h"
@@ -93,6 +93,12 @@ void send_fcup_request(const char *url, int request_id, char *client_session_id,
    
     plist_free(req_root_node);   
     free (plist_xml);
+}
+
+
+std::string string_replace(const std::string &str, const std::string &pattern, const std::string &with) {
+  std::regex p(pattern);
+  return std::regex_replace(str, p, with);
 }
 
 #define PERSIST_STREAM_DATA 0
@@ -420,3 +426,40 @@ extern "C" void media_data_store_reset() {
   airplay_video_media_data_store::get().reset();
 }
 
+
+bool get_youtube_url(const char *data, uint32_t length, std::string &url) {
+  static std::regex pattern("#YT-EXT-CONDENSED-URL:BASE-URI=\"(.*)\",PARAMS=");
+  std::cmatch groups;
+
+  if (std::regex_search(data, groups, pattern)) {
+    if (groups.size() > 1) {
+      url = groups.str(1);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+std::string get_best_quality_stream_uri(const char *data, uint32_t length) {
+  HLSCode r = hlsparse_global_init();
+  master_t master_playlist;
+  r = hlsparse_master_init(&master_playlist);
+  r = hlsparse_master(data, length, &master_playlist);
+  stream_inf_list_t *best_quality_stream = 0;
+  stream_inf_list_t *stream_inf = &master_playlist.stream_infs;
+  return master_playlist.media.data->uri;
+  while (stream_inf && stream_inf->data) {
+    if (!best_quality_stream) {
+      best_quality_stream = stream_inf;
+    } else if (stream_inf->data->bandwidth > best_quality_stream->data->bandwidth) {
+      best_quality_stream = stream_inf;
+    }
+    stream_inf = stream_inf->next;
+  }
+  if (best_quality_stream) {
+    return best_quality_stream->data->uri;
+  }
+
+  return std::string();
+}
