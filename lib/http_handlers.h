@@ -310,11 +310,14 @@ http_handler_hls(raop_conn_t *conn,
                       http_request_t *request, http_response_t *response,
 			  char **response_data, int *response_datalen) {
     const char *url = http_request_get_url(request);
-    *response_datalen  =  query_media_data(conn->airplay_video, url, response_data);
-    http_response_add_header(response, "Content-Type", "application/x-mpegURL; charset=utf-8");
-    logger_log(conn->raop->logger, LOGGER_ERR, "http_handler_hls is incomplete");
-    assert(0);   
-}
+    *response_datalen  = media_data_store_query_media_data( url, response_data);
+    if (*response_datalen > 0) {
+        http_response_add_header(response, "Content-Type", "application/x-mpegURL; charset=utf-8");
+    } else {
+      http_response_destroy(response);
+      response = http_response_init("HTTP/1.1", 404, "Not Found");
+    } 
+ }
 
 static void
 http_handler_set_property(raop_conn_t *conn,

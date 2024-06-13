@@ -8,9 +8,7 @@
 
 #include "ap_config.h"
 
-namespace aps {
-namespace service {
-class ap_casting_media_data_store {
+class airplay_video_media_data_store {
   /// <summary>
   ///
   /// </summary>
@@ -71,7 +69,7 @@ class ap_casting_media_data_store {
   typedef std::map<std::string, std::string> media_data;
 
 public:
-  static ap_casting_media_data_store &get();
+  static airplay_video_media_data_store &get();
 
   void set_store_root(uint16_t port, char *session_id, int socket_fd);
 
@@ -94,7 +92,6 @@ protected:
 
   static bool is_primary_data_uri(const std::string &uri);
 
-  // add this in a extern C .h file
   void send_fcup_request(const char * uri, int request_id, const char * session_id, int socket_id);
 
   std::string adjust_primary_uri(const std::string &uri);
@@ -111,9 +108,9 @@ protected:
   // For Netflix
   std::string adjust_nfhls_data(const std::string &data);
 
-  ap_casting_media_data_store();
+  airplay_video_media_data_store();
 
-  ~ap_casting_media_data_store();
+  ~airplay_video_media_data_store();
 
 private:
   app_id app_id_;
@@ -127,5 +124,3 @@ private:
   std::mutex mtx_;
   int socket_fd_;
 };
-} // namespace service
-} // namespace aps

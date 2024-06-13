@@ -169,6 +169,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     char *response_data = NULL;
     int response_datalen = 0;
     raop_conn_t *conn = ptr;
+    bool free_response_data = true;
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "conn_request");
     bool logger_debug = (logger_get_level(conn->raop->logger) >= LOGGER_DEBUG);
@@ -355,6 +356,10 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     } else if (hls_request) {
         handler = &http_handler_hls;
+	/* this will get the response_data pointer from the HLS media_data store:
+         * the response_data  should NOT be freed here
+         * (it will be freed when the media data store is reset) */
+	free_response_data = false;
     }
 
     if (handler != NULL) {
@@ -404,9 +409,9 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
                 free(data_str);
             }
         }
-        free(response_data);
-        response_data = NULL;
-        response_datalen = 0;
+        if (free_response_data) {
+            free(response_data);
+	}
     }
 }
 
