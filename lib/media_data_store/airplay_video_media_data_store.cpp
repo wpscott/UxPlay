@@ -258,53 +258,6 @@ bool airplay_video_media_data_store::is_primary_data_uri(const std::string &uri)
   return false;
 }
 
-  //void airplay_video_media_data_store::send_fcup_request(const std::string &uri) {
-  //std::ostringstream oss;
-  // clang-format off
-  //oss << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-  //       "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-  //       "<plist version=\"1.0\">\n"
-  //       "\t<dict>\n"
-  //       "\t\t<key>sessionID</key>\n"
-  //       "\t\t<integer>1</integer>\n"
-  //       "\t\t<key>type</key>\n"
-  //       "\t\t<string>unhandledURLRequest</string>\n"
-  //       "\t\t<key>request</key>\n"
-  //       "\t\t<dict>\n"
-  //       "\t\t\t<key>FCUP_Response_ClientInfo</key>\n"
-  //       "\t\t\t<integer>1</integer>\n"
-  //       "\t\t\t<key>FCUP_Response_ClientRef</key>\n"
-  //       "\t\t\t<integer>40030004</integer>\n"
-  //       "\t\t\t<key>FCUP_Response_RequestID</key>\n"
-  //       "\t\t\t<integer>" << (request_id_++) << "</integer>\n"
-  //       "\t\t\t<key>FCUP_Response_URL</key>\n"
-  //       "\t\t\t<string>" << uri << "</string>\n"
-  //       "\t\t\t<key>sessionID</key>\n"
-  //       "\t\t\t<integer>1</integer>\n"
-  //       "\t\t\t<key>FCUP_Response_Headers</key>\n"
-  //       "\t\t\t<dict>\n"
-  //       "\t\t\t\t<key>X-Playback-Session-Id</key>\n"
-  //       "\t\t\t\t<string>" << session_id_ << "</string>\n"
-  //       "\t\t\t\t<key>User-Agent</key>\n"
-  //       "\t\t\t\t<string>AppleCoreMedia/1.0.0.11B554a (Apple TV; U; CPU OS 7_0_4 like Mac OS X; en_us)</string>\n"
-  //      "\t\t\t</dict>\n"
-  //       "\t\t</dict>\n"
-  //       "\t</dict>\n"
-  //     "</plist>";
-  //// clang-format on
-
-  //request fcup_request("HTTP/1.1", "POST", "/event");
-  //fcup_request.with_header("X-Apple-Session-ID", session_id_)
-  //    .with_content_type(TEXT_APPLE_PLIST_XML)
-  //    .with_content(oss.str());
-
-  //auto p = airplay_video_event_connection_manager::get().get(session_id_);
-  //auto pp = p.lock();
-  //if (pp) {
-  // pp->send_request(fcup_request);
-  // }
-  //}
-
 std::string airplay_video_media_data_store::adjust_primary_uri(const std::string &uri) {
   std::string s = uri;
   s = string_replace(s, SCHEME_LIST, HTTP_SCHEME);
@@ -427,6 +380,8 @@ extern "C" void media_data_store_reset() {
 }
 
 
+//unused
+#if 0
 bool get_youtube_url(const char *data, uint32_t length, std::string &url) {
   static std::regex pattern("#YT-EXT-CONDENSED-URL:BASE-URI=\"(.*)\",PARAMS=");
   std::cmatch groups;
@@ -463,3 +418,4 @@ std::string get_best_quality_stream_uri(const char *data, uint32_t length) {
 
   return std::string();
 }
+#endif
