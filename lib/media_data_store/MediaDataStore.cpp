@@ -1,21 +1,23 @@
 ﻿/**
- * apsdk - API for an open-source AirPlay  server
- * Copyright (C) 2018-2023 Sheen Tian
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
- *====================================================================
+ *  File: ap_airplay_service.cpp
+ *  Project: apsdk
+ *  Created: Oct 25, 2018
+ *  Author: Sheen Tian
+ *  
+ *  This file is part of apsdk (https://github.com/air-display/apsdk-public) 
+ *  Copyright (C) 2018-2024 Sheen Tian 
+ *  
+ *  apsdk is free software: you can redistribute it and/or modify it under the terms 
+ *  of the GNU General Public License as published by the Free Software Foundation, 
+ *  either version 3 of the License, or (at your option) any later version.
+ *  
+ *  apsdk is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+ *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+ *  See the GNU General Public License for more details.
+ *  
+ *  You should have received a copy of the GNU General Public License along with this. 
+ *  If not, see <https://www.gnu.org/licenses/>.
+ *==============================================================================
  * modified by fduncanh (2024)
  * based on class ap_casting_media_data_store of
  * http://github.com/air-display/apsdk-public
@@ -26,8 +28,7 @@
 #include <stdio.h>
 
 #include  "../hlsparse/hlsparse.h"
-#include  "airplay_video_media_data_store.h"
-//#include "utils.h"
+#include  "MediaDataStore.h"
 
 #include <plist/plist.h>
 #include "../http_response.h"
@@ -119,25 +120,25 @@ void create_resource_file(const std::string &session, const std::string &uri, co
 #endif
 
 
-airplay_video_media_data_store &airplay_video_media_data_store::get() {
-  static airplay_video_media_data_store s_instance;
+MediaDataStore &MediaDataStore::get() {
+  static MediaDataStore s_instance;
   return s_instance;
 }
 
-airplay_video_media_data_store::airplay_video_media_data_store() : app_id_(e_app_unknown) { hlsparse_global_init(); }
+MediaDataStore::MediaDataStore() :  app_id_(e_app_unknown), request_id_(0), start_pos_in_ms_(0.0f), socket_fd_(0)
+{  hlsparse_global_init();}
 
-airplay_video_media_data_store::~airplay_video_media_data_store() = default;
+MediaDataStore::~MediaDataStore() = default;
 
-  //called by
-  void airplay_video_media_data_store::set_store_root(uint16_t port, char *session_id, int socket_fd) {
+
+void MediaDataStore::set_store_root(uint16_t port, int socket_fd) {
   std::ostringstream oss;
   oss << "localhost:" << port;
   host_ = oss.str();
   socket_fd_ = socket_fd;
-  session_id_ = session_id;
 }
 
-bool airplay_video_media_data_store::request_media_data(const std::string &primary_uri, const std::string &session_id) {
+bool MediaDataStore::request_media_data(const std::string &primary_uri, const std::string &session_id) {
   reset();
 
   app_id id = get_appi_id(primary_uri);
@@ -157,8 +158,10 @@ bool airplay_video_media_data_store::request_media_data(const std::string &prima
   return false;
 }
 
-std::string airplay_video_media_data_store::process_media_data(const std::string &uri, const char *data, int datalen,
-							    const char *session_id, int request_id) {
+
+// called from POST /action handler
+std::string MediaDataStore::process_media_data(const std::string &uri, const char *data, int datalen) {
+
   std::string media_data;
 
   if (is_primary_data_uri(uri)) {
@@ -200,14 +203,14 @@ std::string airplay_video_media_data_store::process_media_data(const std::string
     return primary_uri_;
   }
 
-  printf("request_id: %d %d\n", request_id_, request_id);
   auto next_uri = uri_stack_.top();
   uri_stack_.pop();
-  send_fcup_request(next_uri.c_str(), request_id_++, session_id, socket_fd_);
+  send_fcup_request(next_uri.c_str(), request_id_++, session_id_.c_str(),  socket_fd_);
+
   return std::string();
 }
 
-std::string airplay_video_media_data_store::query_media_data(const std::string &path) {
+std::string MediaDataStore::query_media_data(const std::string &path) {
   std::lock_guard<std::mutex> l(mtx_);
   auto it = media_data_.find(path);
   if (it != media_data_.end()) {
@@ -216,7 +219,7 @@ std::string airplay_video_media_data_store::query_media_data(const std::string &
   return std::string();
 }
 
-void airplay_video_media_data_store::reset() {
+void MediaDataStore::reset() {
   app_id_ = e_app_unknown;
   request_id_ = 1;
   session_id_.clear();
@@ -226,7 +229,7 @@ void airplay_video_media_data_store::reset() {
   media_data_.clear();
 }
 
-airplay_video_media_data_store::app_id airplay_video_media_data_store::get_appi_id(const std::string &uri) {
+MediaDataStore::app_id MediaDataStore::get_appi_id(const std::string &uri) {
   // Youtube
   if (0 == uri.find(MLHLS_SCHEME))
     return e_app_youtube;
@@ -238,7 +241,7 @@ airplay_video_media_data_store::app_id airplay_video_media_data_store::get_appi_
   return e_app_unknown;
 }
 
-void airplay_video_media_data_store::add_media_data(const std::string &uri, const std::string &data) {
+void MediaDataStore::add_media_data(const std::string &uri, const std::string &data) {
   {
     std::lock_guard<std::mutex> l(mtx_);
     media_data_[uri] = data;
@@ -249,7 +252,7 @@ void airplay_video_media_data_store::add_media_data(const std::string &uri, cons
 #endif
 }
 
-bool airplay_video_media_data_store::is_primary_data_uri(const std::string &uri) {
+bool MediaDataStore::is_primary_data_uri(const std::string &uri) {
   if (strstr(uri.c_str(), MASTER_M3U8))
     return true;
   if (strstr(uri.c_str(), INDEX_M3U8))
@@ -258,14 +261,14 @@ bool airplay_video_media_data_store::is_primary_data_uri(const std::string &uri)
   return false;
 }
 
-std::string airplay_video_media_data_store::adjust_primary_uri(const std::string &uri) {
+std::string MediaDataStore::adjust_primary_uri(const std::string &uri) {
   std::string s = uri;
   s = string_replace(s, SCHEME_LIST, HTTP_SCHEME);
   s = string_replace(s, HOST_LIST, host_);
   return s;
 }
 
-std::string airplay_video_media_data_store::extract_uri_path(const std::string &uri) {
+std::string MediaDataStore::extract_uri_path(const std::string &uri) {
   std::string s = uri;
   switch (app_id_) {
   case e_app_youtube:
@@ -283,7 +286,7 @@ std::string airplay_video_media_data_store::extract_uri_path(const std::string &
   return s;
 }
 
-std::string airplay_video_media_data_store::adjust_primary_media_data(const std::string &data) {
+std::string MediaDataStore::adjust_primary_media_data(const std::string &data) {
   switch (app_id_) {
   case e_app_youtube:
     return adjust_mlhls_data(data);
@@ -295,7 +298,7 @@ std::string airplay_video_media_data_store::adjust_primary_media_data(const std:
   return data;
 }
 
-std::string airplay_video_media_data_store::adjust_secondary_media_data(const std::string &data) {
+std::string MediaDataStore::adjust_secondary_media_data(const std::string &data) {
   std::string result = data;
 
   static std::regex youtube_pattern("#YT-EXT-CONDENSED-URL:BASE-URI=\"(.*)\",PARAMS=.*PREFIX=\"(.*)\"");
@@ -319,14 +322,14 @@ std::string airplay_video_media_data_store::adjust_secondary_media_data(const st
   return result;
 }
 
-std::string airplay_video_media_data_store::adjust_mlhls_data(const std::string &data) {
+std::string MediaDataStore::adjust_mlhls_data(const std::string &data) {
   std::string s = data;
   s = string_replace(s, MLHLS_SCHEME, HTTP_SCHEME);
   s = string_replace(s, HOST_LIST, host_);
   return s;
 }
 
-std::string airplay_video_media_data_store::adjust_nfhls_data(const std::string &data) {
+std::string MediaDataStore::adjust_nfhls_data(const std::string &data) {
   std::string s = data;
   std::string replace = HTTP_SCHEME;
   replace += host_;
@@ -335,49 +338,86 @@ std::string airplay_video_media_data_store::adjust_nfhls_data(const std::string 
   return s;
 }
 
+// wrappers for the public functions of class MediaDataStore (callable from C): 
 
-  
-// C wrappers for the public functions of class airplay_video_media_data_store (callable from C): 
+//create the media_data_store, return a pointer to it.
+extern "C" void* media_data_store_create(uint16_t port, int socket_fd) {
+    MediaDataStore *media_data_store = new MediaDataStore;
+    media_data_store->set_store_root(port, socket_fd);
+    return (void *) media_data_store;
+}
+
+//delete the media_data_store
+extern "C" void media_data_store_destroy(void *media_data_store) {
+    delete static_cast<MediaDataStore*>(media_data_store);
+}
 
 
 // called by the POST /action handler:
-extern "C" char *media_data_store_process_media_data(const char *url, const char *data, int datalen, const char *session_id, int request_id) {
-  const std::string uri(url);
-  auto location = airplay_video_media_data_store::get().process_media_data(uri, data, datalen, session_id, request_id) ;
-  if (!location.empty()) {
-    size_t len = location.length();
-    char * location_str = (char *) malloc(len + 1);
-    snprintf(location_str, len + 1, location.c_str());
-    location_str[len] = '\0';
-    return location_str; //this needs to be freed 
-  }
-  return NULL;
+extern "C" char *process_media_data(void *media_data_store, const char *url, const char *data, int datalen) {
+    const std::string uri(url);
+    auto location = static_cast<MediaDataStore*>(media_data_store)->process_media_data(uri, data, datalen) ;
+    if (!location.empty()) {
+        size_t len = location.length();
+        char * location_str = (char *) malloc(len + 1);
+        snprintf(location_str, len + 1, location.c_str());
+        location_str[len] = '\0';
+        return location_str; //this needs to be freed 
+    }
+    return NULL;
 }
 
 //called by the POST /play handler
-extern "C" bool media_data_store_request_media_data(const char *primary_url, const char* session_id) {
-  const std::string primary_uri = primary_url;
-  const std::string session_id_out = session_id;
-  return airplay_video_media_data_store::get().request_media_data(primary_uri, session_id_out);
+extern "C" bool request_media_data(void *media_data_store, const char *primary_url, const char * session_id_in) {
+    const std::string primary_uri = primary_url;
+    const std::string session_id = session_id_in;
+    return static_cast<MediaDataStore*>(media_data_store)->request_media_data(primary_uri, session_id);
 }
 
 
 //called by airplay_video_media_http_connection::get_handler:   &path = req.uri)
-extern "C" int  media_data_store_query_media_data(const char *url, const char **media_data) {
-  const std::string path = url;
-  auto data =  airplay_video_media_data_store::get().query_media_data(path);
-  if (data.empty()) {
-    return 0;
-  }
-  size_t len = data.length();
-  *media_data = data.c_str();
-  return (int) len;
+extern "C" int  query_media_data(void *media_data_store, const char *url, const char **media_data) {
+    const std::string path = url;
+    auto data =  static_cast<MediaDataStore*>(media_data_store)->query_media_data(path);
+    if (data.empty()) {
+        return 0;
+    }
+    size_t len = data.length();
+    *media_data = data.c_str();
+    return (int) len;
 }
 
 //called by the post_stop_handler:
-extern "C" void media_data_store_reset() {
-  airplay_video_media_data_store::get().reset();
+extern "C" void media_data_store_reset(void *media_data_store) {
+    static_cast<MediaDataStore*>(media_data_store)->reset();
 }
+
+// set and get session_id_ and start_pos_in_ms_
+
+extern "C" const char *get_session_id(void *media_data_store) {
+    return static_cast<MediaDataStore*>(media_data_store)->get_session_id();
+}
+
+extern "C" void set_session_id(void *media_data_store, const char *session_id) {
+    static_cast<MediaDataStore*>(media_data_store)->set_session_id(session_id);
+}
+
+extern "C" const char *get_plackback_uuid(void *media_data_store) {
+    return static_cast<MediaDataStore*>(media_data_store)->get_playback_uuid();
+}
+
+extern "C" void set_playback_uuid(void *media_data_store, const char *playback_uuid) {
+    static_cast<MediaDataStore*>(media_data_store)->set_playback_uuid(playback_uuid);
+}
+
+extern "C" float get_start_pos_in_ms(void *media_data_store) {
+    return static_cast<MediaDataStore*>(media_data_store)->get_start_pos_in_ms();
+}
+
+extern "C" void set_start_pos_in_ms(void *media_data_store, float start_pos_in_ms) {
+    static_cast<MediaDataStore*>(media_data_store)->set_start_pos_in_ms(start_pos_in_ms);
+}
+
 
 
 //unused

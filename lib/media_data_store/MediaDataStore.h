@@ -1,25 +1,25 @@
-﻿/**
- * apsdk - API for an open-source AirPlay  server
- * Copyright (C) 2018-2023 Sheen Tian
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
- *====================================================================
- * modified by fduncanh (2024)
- * based on class ap_casting_media_data_store of
- * http://github.com/air-display/apsdk-public
- */
+﻿/** 
+ *  File: ap_airplay_service.cpp
+ *  Project: apsdk
+ *  Created: Oct 25, 2018
+ *  Author: Sheen Tian
+ *  
+ *  This file is part of apsdk (https://github.com/air-display/apsdk-public) 
+ *  Copyright (C) 2018-2024 Sheen Tian 
+ *  
+ *  apsdk is free software: you can redistribute it and/or modify it under the terms 
+ *  of the GNU General Public License as published by the Free Software Foundation, 
+ *  either version 3 of the License, or (at your option) any later version.
+ *  
+ *  apsdk is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+ *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+ *  See the GNU General Public License for more details.
+ *  
+ *  You should have received a copy of the GNU General Public License along with this. 
+ *  If not, see <https://www.gnu.org/licenses/>.
+ *==============================================================================
+ * modified by fduncanh (2024)                                                                                                                                        * based on class ap_casting_media_data_store of                                                                                                                     
+ * http://github.com/air-display/apsdk-public                                                                                                                         */                                               
 
 #pragma once
 #include <map>
@@ -29,9 +29,7 @@
 #include <vector>
 #include <mutex>
 
-#include "ap_config.h"
-
-class airplay_video_media_data_store {
+class MediaDataStore {
   /// <summary>
   ///
   /// </summary>
@@ -91,17 +89,60 @@ class airplay_video_media_data_store {
   /// </summary>
   typedef std::map<std::string, std::string> media_data;
 
+private:
+  
+  app_id app_id_;
+  uint32_t request_id_;
+  std::string session_id_;
+  std::string primary_uri_;
+  std::stack<std::string> uri_stack_;
+
+  std::string playback_uuid_;
+  float start_pos_in_ms_;
+  std::string host_;
+  media_data media_data_;
+  std::mutex mtx_;
+  int socket_fd_;
+
 public:
-  static airplay_video_media_data_store &get();
 
-  void set_store_root(uint16_t port, char *session_id, int socket_fd);
+  MediaDataStore();
 
+  ~MediaDataStore();
+
+  static MediaDataStore &get();
+
+  void set_store_root(uint16_t port, int socket_fd); 
+
+  const char* get_session_id () {
+    return session_id_.c_str();
+  }
+  
+  void set_session_id(const char * session_id) {
+    session_id_ = session_id;
+  }
+
+  const char* get_playback_uuid () {
+    return playback_uuid_.c_str();
+  }
+  
+  void set_playback_uuid(const char * playback_uuid) {
+    playback_uuid_ = playback_uuid;
+  }
+
+  float get_start_pos_in_ms() {
+    return start_pos_in_ms_;
+  }
+  
+  void set_start_pos_in_ms(float start_pos_in_ms) {
+    start_pos_in_ms_ = start_pos_in_ms;
+  }
+  
   // request media data from client side
   bool request_media_data(const std::string &primary_uri, const std::string &session_id);
 
   // generate and store the media data
-  std::string process_media_data(const std::string &uri, const char *data, int datalen,
-				 const char *session_id, int request_id);
+  std::string process_media_data(const std::string &uri, const char *data, int datalen);
 
   // serve the media data for player
   std::string query_media_data(const std::string &path);
@@ -115,7 +156,7 @@ protected:
 
   static bool is_primary_data_uri(const std::string &uri);
 
-  void send_fcup_request(const char * uri, int request_id, const char * session_id, int socket_id);
+  void send_fcup_request(const char * uri, int request_id, const char * session_id_str, int socket_id);
 
   std::string adjust_primary_uri(const std::string &uri);
 
@@ -131,19 +172,4 @@ protected:
   // For Netflix
   std::string adjust_nfhls_data(const std::string &data);
 
-  airplay_video_media_data_store();
-
-  ~airplay_video_media_data_store();
-
-private:
-  app_id app_id_;
-  uint32_t request_id_;
-  std::string session_id_;
-  std::string primary_uri_;
-  std::stack<std::string> uri_stack_;
-
-  std::string host_;
-  media_data media_data_;
-  std::mutex mtx_;
-  int socket_fd_;
 };
