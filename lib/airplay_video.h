@@ -17,6 +17,11 @@
 #ifndef AIRPLAY_VIDEO_H
 #define AIRPLAY_VIDEO_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #include <stdint.h>
 #include <stdbool.h>
 #include "raop.h"
@@ -24,17 +29,47 @@
 
 typedef struct airplay_video_s airplay_video_t;
 
+
 int airplay_video_acquire_playback_info(airplay_video_t *airplay_video, const char *session_id, char **plist_xml);
-void airplay_media_reset(airplay_video_t *airplay_video);
 void airplay_video_stop(airplay_video_t *airplay_video, const char *session_id);
 void airplay_video_rate(airplay_video_t *airplay_video, const char *session_id, double rate);
 void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, const char *location, double start_position);
 void airplay_video_scrub(airplay_video_t *airplay_video, const char *session_id, double scrub_position);
-int query_media_data(airplay_video_t *airplay_video, const char *url, char **response_data);
-char *airplay_process_media_data(airplay_video_t *airplay_video, char *fcup_response_url, char *fcup_response_data,
-                            int fcup_response_datalen, int request_id);
 
 void airplay_video_service_start(airplay_video_t *airplay_video);
 void airplay_video_service_stop(airplay_video_t *airplay_video);
 void airplay_video_service_destroy(airplay_video_t *airplay_video);
+
+
+void * get_media_data_store(airplay_video_t * airplay_video);
+//  C wrappers for c++ class MediaDataStore
+//create the media_data_store, return a pointer to it.
+void* media_data_store_create(uint16_t port, int socket_fd);
+
+//delete the media_data_store
+void media_data_store_destroy(void *media_data_store);
+
+// called by the POST /action handler:
+char *process_media_data(void *media_data_store, const char *url, const char *data, int datalen);
+
+//called by the POST /play handler
+bool request_media_data(void *media_data_store, const char *primary_url, const char * session_id_in);
+
+//called by airplay_video_media_http_connection::get_handler:   &path = req.uri)
+int query_media_data(void *media_data_store, const char *url, const char **media_data);
+
+//called by the post_stop_handler:
+void media_data_store_reset(void *media_data_store);
+
+// set and get session_id_, start_pos_in_ms_, and playback_uuid_
+const char *get_session_id(void *media_data_store);
+void set_session_id(void *media_data_store, const char *session_id);
+const char *get_plackback_uuid(void *media_data_store);
+void set_playback_uuid(void *media_data_store, const char *playback_uuid);
+float get_start_pos_in_ms(void *media_data_store);
+void set_start_pos_in_ms(void *media_data_store, float start_pos_in_ms);
+
+#ifdef __cplusplus
+}
+#endif
 #endif //AIRPLAY_VIDEO_H

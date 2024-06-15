@@ -1,5 +1,8 @@
 #include "airplay_video.h"
 
+typedef void (*hls_handler_t)(raop_conn_t *, http_request_t *,
+                               http_response_t *, const char **, int *);
+
 static void
 http_handler_server_info(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                          char **response_data, int *response_datalen)  {
@@ -128,11 +131,78 @@ http_handler_rate(raop_conn_t *conn, http_request_t *request, http_response_t *r
 }
 
 static void
+http_handler_fpsetup2(raop_conn_t *conn, http_request_t *request, http_response_t *response,
+                      char **response_data, int *response_datalen) {
+    logger_log(conn->raop->logger, LOGGER_WARNING, "client HTTP request POST fp-setup2 is unhandled");
+    http_response_add_header(response, "Content-Type", "application/x-apple-binary-plist");
+    int req_datalen;
+    const unsigned char *req_data = (unsigned char *) http_request_get_data(request, &req_datalen);
+    logger_log(conn->raop->logger, LOGGER_ERR, "only FairPlay version 0x03 is implemented, version is 0x%2.2x", req_data[4]);
+    http_response_destroy(response);
+    response = http_response_init("HTTP/1.1", 421, "Misdirected Request");
+}
+
+
+static void
+http_handler_playback_info(raop_conn_t *conn,
+                      http_request_t *request, http_response_t *response,
+                      char **response_data, int *response_datalen)
+{
+    logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_playback_info");
+    const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
+    
+    *response_datalen  =  airplay_video_acquire_playback_info(conn->airplay_video, session_id, response_data);
+
+    /* last character (at *response_data[response_datalen - 1]) is  0x0a = '\n'
+     * (*response_data[response_datalen] is '\0').
+     * apsdk removes the last "\n" by overwriting it with '\0', and reducing response_datalen by 1. 
+     * TODO: check if this is necessary  */
+
+    http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
+}
+
+static void
+http_handler_set_property(raop_conn_t *conn,
+                      http_request_t *request, http_response_t *response,
+			  char **response_data, int *response_datalen) {
+
+    const char *url = http_request_get_url(request);
+    const char *property = strstr(url, "/setProperty?") + 1;
+    logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_set_property: %s", property);
+
+    if (!strcmp(url, "reverseEndTime") ||
+        !strcmp(url, "forwardEndTime") ||
+        !strcmp(url, "actionAtItemEnd")) {
+        logger_log(conn->raop->logger, LOGGER_DEBUG, "property %s is known but unhandled", property);
+      
+        plist_t errResponse = plist_new_dict();
+        plist_t errCode = plist_new_uint(0);
+        plist_dict_set_item(errResponse, "errorCode", errCode);
+        plist_to_xml(errResponse, response_data, (uint32_t *) response_datalen);
+        printf("%s", *response_data);
+        plist_free(errResponse);
+        http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
+    } else {
+        logger_log(conn->raop->logger, LOGGER_DEBUG, "property %s is unknown, unhandled", property);      
+        http_response_add_header(response, "Content-Length", "0");
+    }
+}
+
+
+// handlers that use the airplay_video_media_data_store   (c++ code)
+
+static void
 http_handler_stop(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                   char **response_data, int *response_datalen) {
     logger_log(conn->raop->logger, LOGGER_INFO, "client HTTP request POST stop");
-    airplay_media_reset(conn->airplay_video);
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
+    void *media_data_store = get_media_data_store(conn->airplay_video);
+    
+    if (media_data_store) {
+        media_data_store_reset(media_data_store);
+    } else {
+        logger_log(conn->raop->logger, LOGGER_DEBUG, "media_data_store not found");
+    }
     airplay_video_stop(conn->airplay_video, session_id);
 }
 
@@ -145,6 +215,13 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
     char *fcup_response_data = NULL;
     char *fcup_response_url = NULL;
     uint64_t uint_val;
+    void *media_data_store = NULL;
+
+    media_data_store = get_media_data_store(conn->airplay_video);
+    if (!media_data_store) {
+        logger_log(conn->raop->logger, LOGGER_ERR, "media_data_store not found");
+        return;
+    }
     
     /* verify that this reponse contains a binary plist*/
     char *header_str = NULL;
@@ -208,9 +285,11 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
     handle_fcup:
     /* handling type "unhandledURLResponse" (case 1)*/
     uint_val = 0;
-    int request_id = 0;
     int fcup_response_datalen = 0;
-    int fcup_response_statuscode;
+
+#if 0   // these entries were not used by apsdk
+    int request_id = 0;
+    int fcup_response_statuscode = 0;
 
     plist_t plist_fcup_response_statuscode_node = plist_dict_get_item(req_params_node, "FCUP_Response_StatusCode");
     plist_get_uint_val(plist_fcup_response_statuscode_node, &uint_val);
@@ -222,6 +301,13 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
         goto post_action_error;
     }
 
+    plist_t plist_fcup_response_requestid_node = plist_dict_get_item(req_params_node, "FCUP_Response_RequestID");    
+    plist_get_uint_val(plist_fcup_response_requestid_node, &uint_val);
+    request_id = (int) uint_val;
+    uint_val = 0;
+#endif
+
+    
     plist_t plist_fcup_response_url_node = plist_dict_get_item(req_params_node, "FCUP_Response_URL");
     plist_get_string_val(plist_fcup_response_url_node, &fcup_response_url);
     if (!fcup_response_url) {
@@ -240,18 +326,11 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
       goto post_action_error;
     }
 
-    plist_t plist_fcup_response_requestid_node = plist_dict_get_item(req_params_node, "FCUP_Response_RequestID");    
-    plist_get_uint_val(plist_fcup_response_requestid_node, &uint_val);
-    request_id = (int) uint_val;
-    
-    char *location = airplay_process_media_data(conn->airplay_video, fcup_response_url, fcup_response_data,
-                                                fcup_response_datalen, request_id); 
-    
+    char *location = process_media_data(media_data_store, fcup_response_url, fcup_response_data, fcup_response_datalen); 
     /* play, if location != NULL */
     if (location) {
       const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
-      double position_in_secs = 0.0;
-      airplay_video_play(conn->airplay_video, session_id, location, position_in_secs);
+      airplay_video_play(conn->airplay_video, session_id, location, get_start_pos_in_ms(media_data_store));
     }
     
  finish:
@@ -275,76 +354,27 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
 }
 
 static void
-http_handler_fpsetup2(raop_conn_t *conn, http_request_t *request, http_response_t *response,
-                      char **response_data, int *response_datalen) {
-    logger_log(conn->raop->logger, LOGGER_WARNING, "client HTTP request POST fp-setup2 is unhandled");
-    http_response_add_header(response, "Content-Type", "application/x-apple-binary-plist");
-    int req_datalen;
-    const unsigned char *req_data = (unsigned char *) http_request_get_data(request, &req_datalen);
-    logger_log(conn->raop->logger, LOGGER_ERR, "only FairPlay version 0x03 is implemented, version is 0x%2.2x", req_data[4]);
-    http_response_destroy(response);
-    response = http_response_init("HTTP/1.1", 421, "Misdirected Request");
-}
-
-
-static void
-http_handler_playback_info(raop_conn_t *conn,
-                      http_request_t *request, http_response_t *response,
-                      char **response_data, int *response_datalen)
-{
-    logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_playback_info");
-    const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
-    
-    *response_datalen  =  airplay_video_acquire_playback_info(conn->airplay_video, session_id, response_data);
-
-    /* last character (at *response_data[response_datalen - 1]) is  0x0a = '\n'
-     * (*response_data[response_datalen] is '\0').
-     * apsdk removes the last "\n" by overwriting it with '\0', and reducing response_datalen by 1. 
-     * TODO: check if this is necessary  */
-
-    http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
-}
-
-static void
-http_handler_hls(raop_conn_t *conn,
-                      http_request_t *request, http_response_t *response,
-			  char **response_data, int *response_datalen) {
+http_handler_hls(raop_conn_t *conn,  http_request_t *request, http_response_t *response,
+			  const char **response_data, int *response_datalen) {
     const char *url = http_request_get_url(request);
-    *response_datalen  = media_data_store_query_media_data( url, response_data);
+    void *media_data_store = NULL;
+
+    media_data_store = get_media_data_store(conn->airplay_video);
+    if (!media_data_store) {
+        logger_log(conn->raop->logger, LOGGER_ERR, "media_data_store not found");
+        return;
+    }
+    *response_datalen = query_media_data(media_data_store, url, response_data);
+    http_response_add_header(response, "Access-Control-Allow-Headers", "Content-type");
+    http_response_add_header(response, "Access-Control-Allow-Origin", "*");
+    
     if (*response_datalen > 0) {
         http_response_add_header(response, "Content-Type", "application/x-mpegURL; charset=utf-8");
-    } else {
+    } else if (*response_datalen == 0) {
       http_response_destroy(response);
       response = http_response_init("HTTP/1.1", 404, "Not Found");
     } 
  }
-
-static void
-http_handler_set_property(raop_conn_t *conn,
-                      http_request_t *request, http_response_t *response,
-			  char **response_data, int *response_datalen) {
-
-    const char *url = http_request_get_url(request);
-    const char *property = strstr(url, "/setProperty?") + 1;
-    logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_set_property: %s", property);
-
-    if (!strcmp(url, "reverseEndTime") ||
-        !strcmp(url, "forwardEndTime") ||
-        !strcmp(url, "actionAtItemEnd")) {
-        logger_log(conn->raop->logger, LOGGER_DEBUG, "property %s is known but unhandled", property);
-      
-        plist_t errResponse = plist_new_dict();
-        plist_t errCode = plist_new_uint(0);
-        plist_dict_set_item(errResponse, "errorCode", errCode);
-        plist_to_xml(errResponse, response_data, (uint32_t *) response_datalen);
-        printf("%s", *response_data);
-        plist_free(errResponse);
-        http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
-    } else {
-        logger_log(conn->raop->logger, LOGGER_DEBUG, "property %s is unknown, unhandled", property);      
-        http_response_add_header(response, "Content-Length", "0");
-    }
-}
 
 static void
 http_handler_play(raop_conn_t *conn,
@@ -354,11 +384,19 @@ http_handler_play(raop_conn_t *conn,
     char* playback_location = NULL;
     plist_t req_root_node = NULL;
     double start_position = 0.0;
+    float start_pos_in_ms = 0.0f;
     bool data_is_binary_plist = false;
     bool data_is_text = false;
     bool data_is_octet = false;
+    void *media_data_store = NULL;
+
+    media_data_store = get_media_data_store(conn->airplay_video);
+    if (!media_data_store) {
+        logger_log(conn->raop->logger, LOGGER_ERR, "media_data_store not found");
+        return;
+    }
+
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_play");
-    
     session_id = http_request_get_header(request, "X-Apple-Session-ID");
     if (!session_id) {
         logger_log(conn->raop->logger, LOGGER_ERR, "Play request had no X-Apple-Session-ID");
@@ -399,8 +437,14 @@ http_handler_play(raop_conn_t *conn,
 #if 0	//this seems to have no purpose
         plist_t req_uuid_node = plist_dict_get_item(req_root_node, "uuid");
         if (!req_uuid_node) {
-	  goto play_error;    /* just check if uuid is present in plist, but make no use of it ? */
-        }
+            goto play_error;    /* just check if uuid is present in plist, but make no use of it ? */
+            // apsdk does store playback_uuid_
+        } else {
+            const char* playback_uuid;
+            plist_get_string_val(req_content_location_node, &playback_uuid);
+            set_playback_uuid(playback_uuid);
+            free (playback_uuid);
+	}
 #endif
         plist_t req_content_location_node = plist_dict_get_item(req_root_node, "Content-Location");
         if (!req_content_location_node) {
@@ -414,12 +458,23 @@ http_handler_play(raop_conn_t *conn,
             logger_log(conn->raop->logger, LOGGER_INFO, "No Start-Position-Seconds in Play request");
         } else {
              plist_get_real_val(req_content_location_node, &start_position);
+	     start_pos_in_ms = (float) (start_position * 1000);
+	     set_start_pos_in_ms(media_data_store, start_pos_in_ms);
         }
     }
 
-    airplay_video_play(conn->airplay_video, session_id, playback_location, start_position);
+    if (!request_media_data(media_data_store, playback_location, session_id)) {
+        /* normal play, not HLS */
+        logger_log(conn->raop->logger, LOGGER_INFO, "Play normal (non-HLS) video");
+        
+	airplay_video_play(conn->airplay_video, session_id, playback_location, get_start_pos_in_ms(media_data_store));
+      }
+
+    if (playback_location) {
+        free (playback_location);
+    }
     if (req_root_node) {
-      plist_free(req_root_node);
+        plist_free(req_root_node);
     }
     return;
 
@@ -431,3 +486,4 @@ http_handler_play(raop_conn_t *conn,
     http_response_destroy(response);
     response = http_response_init("HTTP/1.1", 400, "Bad Request");
 }
+

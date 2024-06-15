@@ -167,6 +167,7 @@ conn_init(void *opaque, unsigned char *local, int locallen, unsigned char *remot
 static void
 conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     char *response_data = NULL;
+    const char *hls_response_data = NULL;
     int response_datalen = 0;
     raop_conn_t *conn = ptr;
     bool free_response_data = true;
@@ -286,6 +287,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "Handling request %s with URL %s", method, url);
     raop_handler_t handler = NULL;
+    hls_handler_t hls_handler = NULL;
     if (!hls_request && !strcmp(protocol, "RTSP/1.0")) {
         if (!strcmp(method, "POST")) {
             if (!strcmp(url, "/feedback")) {
@@ -355,7 +357,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
             }
         }
     } else if (hls_request) {
-        handler = &http_handler_hls;
+        hls_handler = &http_handler_hls;
 	/* this will get the response_data pointer from the HLS media_data store:
          * the response_data  should NOT be freed here
          * (it will be freed when the media data store is reset) */
@@ -364,6 +366,9 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
 
     if (handler != NULL) {
         handler(conn, request, *response, &response_data, &response_datalen);
+    } else if (hls_handler != NULL) {
+        hls_handler(conn, request, *response, &hls_response_data, &response_datalen);
+        http_response_finish(*response, hls_response_data, response_datalen);
     } else {
       logger_log(conn->raop->logger, LOGGER_INFO,
 		 "Unhandled Client Request: %s %s %s", method, url, protocol);
@@ -385,6 +390,9 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     }
     header_str =  utils_data_to_text(data, len);
     logger_log(conn->raop->logger, LOGGER_DEBUG, "\n%s", header_str);
+
+    /* the hls_response data of the hls_handler should not be displayed or free'd */
+    
     bool data_is_plist = (strstr(header_str,"apple-binary-plist") != NULL);
     bool data_is_text = (strstr(header_str,"text/") != NULL);
     free(header_str);

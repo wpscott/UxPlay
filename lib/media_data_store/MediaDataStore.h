@@ -29,6 +29,10 @@
 #include <vector>
 #include <mutex>
 
+extern "C" {
+    int  fcup_request(void *conn_opaque, const char *url, const char *session_id, int request_id);
+}
+
 class MediaDataStore {
   /// <summary>
   ///
@@ -103,29 +107,27 @@ private:
   media_data media_data_;
   std::mutex mtx_;
   int socket_fd_;
-
+  void *conn_opaque_;
 public:
 
+  //static std::string str_;
+  
   MediaDataStore();
 
   ~MediaDataStore();
 
   static MediaDataStore &get();
 
-  void set_store_root(uint16_t port, int socket_fd); 
+  void set_store_root(void *conn, uint16_t port); 
 
-  const char* get_session_id () {
-    return session_id_.c_str();
+  bool check_session_id(std::string session_id) {
+    return  (session_id_ == session_id);
   }
-  
+    
   void set_session_id(const char * session_id) {
     session_id_ = session_id;
   }
 
-  const char* get_playback_uuid () {
-    return playback_uuid_.c_str();
-  }
-  
   void set_playback_uuid(const char * playback_uuid) {
     playback_uuid_ = playback_uuid;
   }
@@ -137,7 +139,7 @@ public:
   void set_start_pos_in_ms(float start_pos_in_ms) {
     start_pos_in_ms_ = start_pos_in_ms;
   }
-  
+
   // request media data from client side
   bool request_media_data(const std::string &primary_uri, const std::string &session_id);
 
@@ -156,7 +158,7 @@ protected:
 
   static bool is_primary_data_uri(const std::string &uri);
 
-  void send_fcup_request(const char * uri, int request_id, const char * session_id_str, int socket_id);
+  void send_fcup_request(std::string uri, std::string session_id, int request_id);
 
   std::string adjust_primary_uri(const std::string &uri);
 

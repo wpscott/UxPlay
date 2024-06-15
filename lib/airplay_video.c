@@ -28,7 +28,6 @@
 #include <plist/plist.h>
 //#include <gst/gst.h>
 
-
 #include "raop.h"
 #include "threads.h"
 #include "compat.h"
@@ -71,6 +70,8 @@ struct airplay_video_s {
     char *hls_prefix;
     char *playback_location;
     playback_info_t *playback_info;
+    void *media_data_store;
+
   
     thread_handle_t thread;
     mutex_handle_t run_mutex;
@@ -90,68 +91,9 @@ struct airplay_video_s {
     int joined;
 };
 
-static
-void send_fcup_request(airplay_video_t *airplay_video, const char *url) {
-    /* values taken from apsdk-public;  */
-  
-    /* these seem to be arbitrary choices */
-    const int sessionID = 1;
-    const int FCUP_Response_ClientInfo = 1;
-    const int FCUP_Response_ClientRef = 40030004;
 
-    /* taken from a working AppleTV? */
-    const char User_Agent[] = "AppleCoreMedia/1.0.0.11B554a (Apple TV; U; CPU OS 7_0_4 like Mac OS X; en_us";
-
-    plist_t session_id_node = plist_new_int((int64_t) sessionID);
-    plist_t type_node = plist_new_string("unhandledURLRequest");
-    plist_t client_info_node = plist_new_int(FCUP_Response_ClientInfo);
-    plist_t client_ref_node = plist_new_int((int64_t) FCUP_Response_ClientRef);
-    plist_t request_id_node = plist_new_int((int64_t) (airplay_video->request_id)++);
-    plist_t url_node = plist_new_string(url);
-    plist_t playback_session_id_node = plist_new_string(airplay_video->session_id);
-    plist_t user_agent_node = plist_new_string(User_Agent);
-    
-    plist_t req_root_node = plist_new_dict();
-    plist_dict_set_item(req_root_node, "sessionID", session_id_node);
-    plist_dict_set_item(req_root_node, "type", type_node);
-
-    plist_t fcup_request_node = plist_new_dict();
-    plist_dict_set_item(fcup_request_node, "FCUP_Response_ClientInfo", client_info_node);
-    plist_dict_set_item(fcup_request_node, "FCUP_Response_ClientRef", client_ref_node);
-    plist_dict_set_item(fcup_request_node, "FCUP_Response_RequestID", request_id_node);
-    plist_dict_set_item(fcup_request_node, "FCUP_Response_URL", url_node);
-    plist_dict_set_item(fcup_request_node, "SessionID", session_id_node);
-				    
-    plist_t fcup_response_header_node = plist_new_dict;
-    plist_dict_set_item(fcup_response_header_node, "X-Playback-Session-ID", playback_session_id_node);
-    plist_dict_set_item(fcup_response_header_node, "User-Agent", user_agent_node);
-
-    plist_dict_set_item(fcup_request_node, "FCUP_Response_Header", fcup_response_header_node);
-    plist_dict_set_item(req_root_node, "request", fcup_request_node);
-    
-    uint32_t uint_val;
-    char *plist_xml;
-    plist_to_xml(req_root_node, &plist_xml, &uint_val);
-    int datalen = (int) uint_val;
-			  
-    /* use tools for creating http responses to create the reverse http request */
-    http_response_t *request = http_response_init_with_codestr("POST", "/event", "HTTP/1.1");
-    http_response_add_header(request, "X-Apple-Session-ID", airplay_video->session_id);
-    http_response_add_header(request, "Content-Type", "text/x-apple-plist+xml");
-    http_response_finish(request, plist_xml, datalen);
-    
-    int len;
-    const char *reverse_request = http_response_get_data(request, &len);
-    logger_log(airplay_video->logger, LOGGER_DEBUG, "%s", reverse_request);
-    int send_len = send(airplay_video->rsock, reverse_request, len, 0);
-    if (send_len < 0) {
-        int sock_err = SOCKET_GET_ERROR();
-        logger_log(airplay_video->logger, LOGGER_ERR, "airplay_video error sending request. Error %d:%s",
-                   sock_err, strerror(sock_err));
-    }
-   
-    plist_free(req_root_node);   
-    free (plist_xml);
+void * get_media_data_store(airplay_video_t * airplay_video) {
+  return airplay_video->media_data_store;
 }
 
 
@@ -565,11 +507,7 @@ void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, 
 
 /* unimplemented */
 
-// corresponds to casting_media_data_store:: reset
 
-void airplay_media_reset(airplay_video_t *airplay_video) {
-
-}
 
 // handles POST /stop requests
 // corresponds to on_video_sto
@@ -591,13 +529,66 @@ void airplay_video_scrub( airplay_video_t *airplay_video, const char *session_id
 }
 
 
-// t equivalent aspdk code is in service/casting_media_data_store: process_media_data
-int query_media_data(airplay_video_t *airplay_video, const char *url, char **response_data) {
-  return 0;
+
+void send_fcup_request(const char *url, int request_id, char *client_session_id, int socket_fd) {
+    /* values taken from apsdk-public;  */
+  
+    /* these seem to be arbitrary choices */
+    const int sessionID = 1;
+    const int FCUP_Response_ClientInfo = 1;
+    const int FCUP_Response_ClientRef = 40030004;
+
+    /* taken from a working AppleTV? */
+    const char User_Agent[] = "AppleCoreMedia/1.0.0.11B554a (Apple TV; U; CPU OS 7_0_4 like Mac OS X; en_us";
+
+    plist_t session_id_node = plist_new_int((int64_t) sessionID);
+    plist_t type_node = plist_new_string("unhandledURLRequest");
+    plist_t client_info_node = plist_new_int(FCUP_Response_ClientInfo);
+    plist_t client_ref_node = plist_new_int((int64_t) FCUP_Response_ClientRef);
+    plist_t request_id_node = plist_new_int((int64_t) request_id);
+    plist_t url_node = plist_new_string(url);
+    plist_t playback_session_id_node = plist_new_string(client_session_id);
+    plist_t user_agent_node = plist_new_string(User_Agent);
+    
+    plist_t req_root_node = plist_new_dict();
+    plist_dict_set_item(req_root_node, "sessionID", session_id_node);
+    plist_dict_set_item(req_root_node, "type", type_node);
+
+    plist_t fcup_request_node = plist_new_dict();
+    plist_dict_set_item(fcup_request_node, "FCUP_Response_ClientInfo", client_info_node);
+    plist_dict_set_item(fcup_request_node, "FCUP_Response_ClientRef", client_ref_node);
+    plist_dict_set_item(fcup_request_node, "FCUP_Response_RequestID", request_id_node);
+    plist_dict_set_item(fcup_request_node, "FCUP_Response_URL", url_node);
+    plist_dict_set_item(fcup_request_node, "SessionID", session_id_node);
+				    
+    plist_t fcup_response_header_node = plist_new_dict();
+    plist_dict_set_item(fcup_response_header_node, "X-Playback-Session-ID", playback_session_id_node);
+    plist_dict_set_item(fcup_response_header_node, "User-Agent", user_agent_node);
+
+    plist_dict_set_item(fcup_request_node, "FCUP_Response_Header", fcup_response_header_node);
+    plist_dict_set_item(req_root_node, "request", fcup_request_node);
+    
+    uint32_t uint_val;
+    char *plist_xml;
+    plist_to_xml(req_root_node, &plist_xml, &uint_val);
+    int datalen = (int) uint_val;
+			  
+    /* use tools for creating http responses to create the reverse http request */
+    http_response_t *request = http_response_init_with_codestr("POST", "/event", "HTTP/1.1");
+    http_response_add_header(request, "X-Apple-Session-ID", client_session_id);
+    http_response_add_header(request, "Content-Type", "text/x-apple-plist+xml");
+    http_response_finish(request, plist_xml, datalen);
+    
+    int len;
+    const char *reverse_request = http_response_get_data(request, &len);
+    int send_len = send(socket_fd, reverse_request, len, 0);
+    if (send_len < 0) {
+        int sock_err = SOCKET_GET_ERROR();
+	fprintf(stderr, "send_fcup_request: error sending request. Error %d:%s",
+                   sock_err, strerror(sock_err));
+    }
+   
+    plist_free(req_root_node);   
+    free (plist_xml);
 }
 
-// ths is the main  code:   equivalent aspdk code is in service/casting_media_data_store: process_media_data
-
-char *airplay_process_media_data(airplay_video_t *airplay_video, char *fcup_response_url, char *fcup_response_data, int fcup_response_datalen, int request_id) {
-   return NULL;
-}

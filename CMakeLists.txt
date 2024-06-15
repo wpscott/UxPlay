@@ -40,6 +40,7 @@ endif()
 add_subdirectory( lib/llhttp )
 add_subdirectory( lib/playfair )
 add_subdirectory( lib/hlsparse )
+add_subdirectory( lib/media_data_store )
 add_subdirectory( lib )
 add_subdirectory( renderers )
 
