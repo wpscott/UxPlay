@@ -27,6 +27,16 @@
 #include "logger.h"
 #include "utils.h"
 
+
+static const char *typename[] = {
+    [CONNECTION_TYPE_UNKNOWN] = "Unknown",
+    [CONNECTION_TYPE_RAOP]    = "RAOP",
+    [CONNECTION_TYPE_AIRPLAY] = "AirPLay",
+    [CONNECTION_TYPE_PTTH]    = "PTTH",
+    [CONNECTION_TYPE_HLS]     = "HLS"
+};
+
+
 struct http_connection_s {
     int connected;
 
@@ -100,6 +110,25 @@ httpd_count_connection_type (httpd_t *httpd, connection_type_t type) {
     }
     return count;
 }
+
+int
+httpd_get_connection_socket_by_type (httpd_t *httpd, connection_type_t type, int instance){
+    int count = 0;
+    for (int i = 0; i < httpd->max_connections; i++) {
+        http_connection_t *connection = &httpd->connections[i];
+        if (!connection->connected) {
+            continue;
+        }
+        if (connection->type == type) {
+            count++;
+	    if (count == instance) {
+	      return connection->socket_fd;
+	    }
+        }
+    }
+    return 0;
+}
+
 
 #define MAX_CONNECTIONS 12  /* value used in AppleTV 3*/
 httpd_t *
@@ -358,7 +387,23 @@ httpd_thread(void *arg)
 	    }
 
             logger_log(httpd->logger, LOGGER_DEBUG, "httpd receiving on socket %d, connection %d", connection->socket_fd, i);
-
+            if (logger_debug) {
+                printf("\nhttpd: current connections:\n");
+                for (int i = 0; i < httpd->max_connections; i++) {
+                    http_connection_t *connection = &httpd->connections[i];
+                    if(!connection->connected) {
+                        continue;
+                    }
+                    if (!FD_ISSET(connection->socket_fd, &rfds)) {
+                        printf("connection %d type %d socket %d  conn %p %s !FD_ISSET\n", i, connection->type, connection->socket_fd,
+                               connection->user_data, typename [connection->type]);
+		    } else {
+                        printf("connection %d type %d socket %d  conn %p %s\n", i, connection->type, connection->socket_fd,
+                               connection->user_data, typename [connection->type]);
+                    }
+                    printf("\n");
+                }
+	    }
             /* reverse-http responses from the client must not be sent to the llhttp parser: such messages start with "HTTP/1.1" */
             if (new_request) {
                 int readstart = 0;
@@ -387,16 +432,14 @@ httpd_thread(void *arg)
 
             if (http_request_is_reverse(connection->request)) {
                 /* this is a reverse response from the client to a GET /event reverse request from the server */
-                if (logger_debug) {
-                    if (ret) {
-                        http_request_add_data(connection->request, buffer, ret);
-                    } else {
-                        int datalen = 0;
-                        const char *data = http_request_get_data(connection->request, &datalen);
-                        char *reverse_response = utils_data_to_text(data, datalen);
-                        logger_log(httpd->logger, LOGGER_INFO, "reverse-http response from client:\n%s", reverse_response);
-                        free(reverse_response);
-                    }
+                if (ret) {
+                    http_request_add_data(connection->request, buffer, ret);
+                } else if (logger_debug) {
+                    int datalen = 0;
+                    const char *data = http_request_get_data(connection->request, &datalen);
+                    char *reverse_response = utils_data_to_text(data, datalen);
+                    logger_log(httpd->logger, LOGGER_INFO, "reverse-http response from client:\n%s", reverse_response);
+                    free(reverse_response);
                 }
                 if (ret == 0) {
                     httpd_remove_connection(httpd, connection);

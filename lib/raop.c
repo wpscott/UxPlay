@@ -72,6 +72,10 @@ struct raop_s {
   
      /* public key as string */
      char pk_str[2*ED25519_KEY_SIZE + 1];
+
+    /* place to store media_data_store */
+     void * media_data_store;
+  
 };
 
 struct raop_conn_s {
@@ -101,6 +105,23 @@ typedef struct raop_conn_s raop_conn_t;
 
 #include "raop_handlers.h"
 #include "http_handlers.h"
+
+void media_data_store_destroy(void *media_data_store);
+
+void set_media_data_store(raop_t *raop, void *media_data_store) {
+    if (raop->media_data_store) {
+        media_data_store_destroy(raop->media_data_store);
+    }
+    if (media_data_store) {
+        raop->media_data_store  = media_data_store;
+    } else {
+        raop->media_data_store  = NULL;
+    }
+}
+
+void *get_media_data_store(raop_t *raop) {
+    return raop->media_data_store;
+}
 
 static void *
 conn_init(void *opaque, unsigned char *local, int locallen, unsigned char *remote, int remotelen, unsigned int zone_id) {
@@ -358,10 +379,6 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     } else if (hls_request) {
         hls_handler = &http_handler_hls;
-	/* this will get the response_data pointer from the HLS media_data store:
-         * the response_data  should NOT be freed here
-         * (it will be freed when the media data store is reset) */
-	free_response_data = false;
     }
 
     if (handler != NULL) {
@@ -375,15 +392,18 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     }
 
     finish:;
-    http_response_add_header(*response, "Server", "AirTunes/"GLOBAL_VERSION);
+    if (hls_handler == NULL) {
+        http_response_add_header(*response, "Server", "AirTunes/"GLOBAL_VERSION);
+    }
     if (cseq) {
         http_response_add_header(*response, "CSeq", cseq);
     }
+    
     http_response_finish(*response, response_data, response_datalen);
 
     int len;
     const char *data = http_response_get_data(*response, &len);
-    if (response_data && response_datalen > 0) {
+    if ((response_data || hls_response_data) && response_datalen > 0) {
         len -= response_datalen;
     } else {
         len -= 2;
@@ -516,6 +536,8 @@ raop_init(raop_callbacks_t *callbacks) {
     raop->max_ntp_timeouts = 0;
     raop->audio_delay_micros = 250000;
 
+    raop->media_data_store = NULL;
+    
     return raop;
 }
 
@@ -571,6 +593,9 @@ void
 raop_destroy(raop_t *raop) {
     if (raop) {
         raop_stop(raop);
+       if (raop->media_data_store) {
+            media_data_store_destroy(raop->media_data_store);
+        }
         pairing_destroy(raop->pairing);
         httpd_destroy(raop->httpd);
         logger_destroy(raop->logger);

@@ -58,7 +58,7 @@ MediaDataStore &MediaDataStore::get() {
   return s_instance;
 }
 
-MediaDataStore::MediaDataStore() :  app_id_(e_app_unknown), request_id_(0), start_pos_in_ms_(0.0f), socket_fd_(0)
+MediaDataStore::MediaDataStore() :  app_id_(e_app_unknown), request_id_(0), start_pos_in_ms_(0.0f)
 {  hlsparse_global_init();}
 
 MediaDataStore::~MediaDataStore() = default;
@@ -94,7 +94,9 @@ bool MediaDataStore::request_media_data(const std::string &primary_uri, const st
 
 void MediaDataStore::send_fcup_request(std::string uri, std::string session_id, int request_id) {
     // extern "C"
+    printf("\n(C++)>>>>>>>>>>>>>>>>>>>>>>(C)fcup_request\n");
     int ret = fcup_request(conn_opaque_, uri.c_str(), session_id.c_str(), request_id);
+    printf("(C++)<<<<<<<<<<<<<<<<<<<<<<(C)fcup_request\n");
     // do something if ret != 0?
 }
 
@@ -164,7 +166,6 @@ void MediaDataStore::reset() {
   session_id_.clear();
   primary_uri_.clear();
   uri_stack_ = std::stack<std::string>();
-
   media_data_.clear();
 }
 
@@ -380,7 +381,6 @@ extern "C" void set_start_pos_in_ms(void *media_data_store, float start_pos_in_m
     static_cast<MediaDataStore*>(media_data_store)->set_start_pos_in_ms(start_pos_in_ms);
     printf("<<<< done\n");
 }
-
 
 //unused
 #if 0

@@ -1,4 +1,23 @@
+/*
+ * Copyright (c) 2022 fduncanh
+ * All Rights Reserved.
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ */
+
+/* this file is part of raop.c and should not be included in any other file */
+
 #include "airplay_video.h"
+#include "fcup_request.h"
 
 typedef void (*hls_handler_t)(raop_conn_t *, http_request_t *,
                                http_response_t *, const char **, int *);
@@ -53,17 +72,14 @@ http_handler_server_info(raop_conn_t *conn, http_request_t *request, http_respon
     plist_free(r_node);
     http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
     free(hw_addr);
-    int socket_fd = httpd_get_connection_socket (conn->raop->httpd, (void *) conn);
-    if (socket_fd < 0) {
-        logger_log(conn->raop->logger, LOGGER_ERR, "faied to retrieve socket_fd from httpd");
-    }
     
     /* initialize the aiplay video service */
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
 
     conn->airplay_video =  (void *) airplay_video_service_init(conn->raop->logger, &(conn->raop->callbacks), conn,
-                                                               conn->raop, socket_fd, conn->raop->port, session_id);
+                                                               conn->raop, conn->raop->port, session_id);
 
+    logger_log(conn->raop->logger, LOGGER_DEBUG, "media_data_store accessible at %p", get_media_data_store(conn->raop));
 }
 
 static void
@@ -72,19 +88,6 @@ http_handler_get_property(raop_conn_t *conn, http_request_t *request, http_respo
     const char *url = http_request_get_url(request);
     const char *property = strstr(url, "/setProperty?") + 1;
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_get_property: %s (unhandled)", property);
-}
-
-static void
-http_handler_reverse(raop_conn_t *conn, http_request_t *request, http_response_t *response,
-                     char **response_data, int *response_datalen) {
-
-    const char *purpose = http_request_get_header(request, "X-Apple-Purpose");
-    const char *connection = http_request_get_header(request, "Connection");
-    const char *upgrade = http_request_get_header(request, "Upgrade");
-    logger_log(conn->raop->logger, LOGGER_INFO, "client requested reverse connection: %s; purpose: %s  \"%s\"",
-               connection, upgrade, purpose);
-    http_response_destroy(response);
-    response = http_response_init("HTTP/1.1", 101, "Switching Protocols");
 }
 
 static void
@@ -189,14 +192,47 @@ http_handler_set_property(raop_conn_t *conn,
 }
 
 
-// handlers that use the airplay_video_media_data_store   (c++ code)
+
+
+static void
+http_handler_reverse(raop_conn_t *conn, http_request_t *request, http_response_t *response,
+                     char **response_data, int *response_datalen) {
+
+    
+    /* get http socket for send */
+    int socket_fd = httpd_get_connection_socket (conn->raop->httpd, (void *) conn);
+    if (socket_fd < 0) {
+        logger_log(conn->raop->logger, LOGGER_ERR, "fcup_request failed to retrieve socket_fd from httpd");
+        /* shut down connection? */
+    }
+    
+    const char *purpose = http_request_get_header(request, "X-Apple-Purpose");
+    const char *connection = http_request_get_header(request, "Connection");
+    const char *upgrade = http_request_get_header(request, "Upgrade");
+    logger_log(conn->raop->logger, LOGGER_INFO, "client requested reverse connection: %s; purpose: %s  \"%s\"",
+               connection, upgrade, purpose);
+
+    httpd_set_connection_type(conn->raop->httpd, (void *) conn, CONNECTION_TYPE_PTTH);
+    int type_PTTH = httpd_count_connection_type(conn->raop->httpd, CONNECTION_TYPE_PTTH);
+
+    if (type_PTTH == 1) {
+        logger_log(conn->raop->logger, LOGGER_DEBUG, "will use socket %d for %s connections", socket_fd, purpose);
+        http_response_destroy(response);
+        response = http_response_init("HTTP/1.1", 101, "Switching Protocols");
+    } else {
+        logger_log(conn->raop->logger, LOGGER_ERR, "multiple TPPH connections (%d) are forbidden", type_PTTH );
+    }    
+}
+
+
+// handlers that use the media_data_store   (c++ code)
 
 static void
 http_handler_stop(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                   char **response_data, int *response_datalen) {
     logger_log(conn->raop->logger, LOGGER_INFO, "client HTTP request POST stop");
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
-    void *media_data_store = get_media_data_store(conn->airplay_video);
+    void *media_data_store = get_media_data_store(conn->raop);
     
     if (media_data_store) {
         media_data_store_reset(media_data_store);
@@ -217,7 +253,7 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
     uint64_t uint_val;
     void *media_data_store = NULL;
 
-    media_data_store = get_media_data_store(conn->airplay_video);
+    media_data_store = get_media_data_store(conn->raop);
     if (!media_data_store) {
         logger_log(conn->raop->logger, LOGGER_ERR, "media_data_store not found");
         return;
@@ -331,6 +367,7 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
     if (location) {
       const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
       airplay_video_play(conn->airplay_video, session_id, location, get_start_pos_in_ms(media_data_store));
+      free (location);
     }
     
  finish:
@@ -359,7 +396,7 @@ http_handler_hls(raop_conn_t *conn,  http_request_t *request, http_response_t *r
     const char *url = http_request_get_url(request);
     void *media_data_store = NULL;
 
-    media_data_store = get_media_data_store(conn->airplay_video);
+    media_data_store = get_media_data_store(conn->raop);
     if (!media_data_store) {
         logger_log(conn->raop->logger, LOGGER_ERR, "media_data_store not found");
         return;
@@ -377,8 +414,7 @@ http_handler_hls(raop_conn_t *conn,  http_request_t *request, http_response_t *r
  }
 
 static void
-http_handler_play(raop_conn_t *conn,
-                      http_request_t *request, http_response_t *response,
+http_handler_play(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                       char **response_data, int *response_datalen) {
     const char* session_id = NULL;
     char* playback_location = NULL;
@@ -389,23 +425,26 @@ http_handler_play(raop_conn_t *conn,
     bool data_is_text = false;
     bool data_is_octet = false;
     void *media_data_store = NULL;
-
-    media_data_store = get_media_data_store(conn->airplay_video);
-    if (!media_data_store) {
-        logger_log(conn->raop->logger, LOGGER_ERR, "media_data_store not found");
-        return;
-    }
+    bool ret;
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_play");
+    printf("airplay_video is at %p\n", conn->airplay_video);
+    media_data_store = get_media_data_store(conn->raop);
+    if (!media_data_store) {
+      logger_log(conn->raop->logger, LOGGER_ERR, "media_data_store not found, conn = %p", conn);
+
+        return;
+    }
+    printf("media_data_store is at %p\n", media_data_store);
+
     session_id = http_request_get_header(request, "X-Apple-Session-ID");
     if (!session_id) {
         logger_log(conn->raop->logger, LOGGER_ERR, "Play request had no X-Apple-Session-ID");
         goto play_error;
     }
-
     int request_datalen = -1;    
     const char *request_data = http_request_get_data(request, &request_datalen);
-    
+    printf("handler_play 2\n");    
     if (request_datalen > 0) {
         char *header_str = NULL;
         http_request_get_header_string(request, &header_str);
@@ -415,7 +454,6 @@ http_handler_play(raop_conn_t *conn,
 	data_is_octet = (strstr(header_str, "octet-stream") != NULL);
 	free (header_str);
     }
-
     if (!data_is_text && !data_is_octet && !data_is_binary_plist) {
       goto play_error;
     }
@@ -431,7 +469,6 @@ http_handler_play(raop_conn_t *conn,
     }
     
     if (data_is_binary_plist) {
-
         plist_from_bin(request_data, request_datalen, &req_root_node);
 
 #if 0	//this seems to have no purpose
@@ -442,7 +479,7 @@ http_handler_play(raop_conn_t *conn,
         } else {
             const char* playback_uuid;
             plist_get_string_val(req_content_location_node, &playback_uuid);
-            set_playback_uuid(playback_uuid);
+            set_playback_uuid(media_data_store, playback_uuid);
             free (playback_uuid);
 	}
 #endif
@@ -462,23 +499,27 @@ http_handler_play(raop_conn_t *conn,
 	     set_start_pos_in_ms(media_data_store, start_pos_in_ms);
         }
     }
-
-    if (!request_media_data(media_data_store, playback_location, session_id)) {
-        /* normal play, not HLS */
-        logger_log(conn->raop->logger, LOGGER_INFO, "Play normal (non-HLS) video");
-        
-	airplay_video_play(conn->airplay_video, session_id, playback_location, get_start_pos_in_ms(media_data_store));
+    printf("http handler play: request_media_data %s %s %p\n", playback_location, session_id, media_data_store);
+    ret = request_media_data(media_data_store, playback_location, session_id);
+    printf("return from request_media, ret = %d\n", ret);
+    
+    if (!ret) {
+        /* normal play, not HLS: assume location is valid */
+        logger_log(conn->raop->logger, LOGGER_INFO, "Play normal (non-HLS) video, location = %s", playback_location);
+        airplay_video_play(conn->airplay_video, session_id, playback_location, get_start_pos_in_ms(media_data_store));
       }
-
+    printf("handler_play: return from request_media_data \n");
     if (playback_location) {
         free (playback_location);
     }
+
     if (req_root_node) {
         plist_free(req_root_node);
     }
-    return;
+     return;
 
  play_error:;
+    printf("play_error\n");
     if (req_root_node) {
       plist_free(req_root_node);
     }

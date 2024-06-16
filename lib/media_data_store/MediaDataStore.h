@@ -30,7 +30,7 @@
 #include <mutex>
 
 extern "C" {
-    int  fcup_request(void *conn_opaque, const char *url, const char *session_id, int request_id);
+  int  fcup_request(void *conn_opaque, const char *url, const char *session_id, int request_id);
 }
 
 class MediaDataStore {
@@ -94,7 +94,7 @@ class MediaDataStore {
   typedef std::map<std::string, std::string> media_data;
 
 private:
-  
+
   app_id app_id_;
   uint32_t request_id_;
   std::string session_id_;
@@ -106,11 +106,9 @@ private:
   std::string host_;
   media_data media_data_;
   std::mutex mtx_;
-  int socket_fd_;
   void *conn_opaque_;
 public:
 
-  //static std::string str_;
   
   MediaDataStore();
 
