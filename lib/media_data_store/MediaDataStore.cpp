@@ -83,7 +83,7 @@ bool MediaDataStore::request_media_data(const std::string &primary_uri, const st
     app_id_ = id;
     session_id_ = session_id;
     primary_uri_ = adjust_primary_uri(primary_uri);
-    MediaDataStore::send_fcup_request(primary_uri_, session_id_, request_id_);
+    MediaDataStore::send_fcup_request(primary_uri, session_id_, request_id_);
     request_id_++;
     return true;
   }
