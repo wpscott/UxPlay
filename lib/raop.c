@@ -353,11 +353,11 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
                 handler = &http_handler_reverse;
             } else if (!strcmp(url, "/play")) {
                 handler = &http_handler_play;
-            } else if (!strcmp(url, "/getProperty?")) {
+            } else if (!strncmp (url, "/getProperty?", strlen("/getProperty?"))) {
                 handler = &http_handler_scrub;
             } else if (!strcmp(url, "/scrub")) {
                 handler = &http_handler_scrub;
-            } else if (!strcmp(url, "/rate")) {
+            } else if (!strncmp(url, "/rate?", strlen("/rate?"))) {
                 handler = &http_handler_rate;
             } else if (!strcmp(url, "/stop")) {
                 handler = &http_handler_stop;
@@ -373,9 +373,10 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
                 handler = &http_handler_playback_info;
             }
         } else if (!strcmp(method, "PUT")) {
-            if (!strcmp(method, "/setProperty?")) {
+	  if (!strncmp (url, "/setProperty?", strlen("/setProperty?"))) {
                 handler = &http_handler_set_property;
-            }
+	  } else {
+	  }
         }
     } else if (hls_request) {
         hls_handler = &http_handler_hls;

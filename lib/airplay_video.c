@@ -40,16 +40,16 @@
 #define MAX_TIME_RANGES 10
 
 typedef struct time_range_s {
-    double start;
-    double duration;
+    float start;
+    float duration;
 } time_range_t;
 
 typedef struct playback_info_s {
     // char * uuid
     // uint32_t stallCount
-    double duration;
-    double position;
-    double rate;
+    float duration;
+    float position;
+    float rate;
     bool readyToPlay;
     bool playbackBufferEmpty;
     bool playbackBufferFull;
@@ -92,33 +92,32 @@ static playback_info_t playback_info_static;
 static time_range_t loaded_time_ranges[MAX_TIME_RANGES];
 static time_range_t seekable_time_ranges[MAX_TIME_RANGES];
 
-int set_playback_info_item(playback_info_t *playback_info, const char *item, double val) {
-     if (strstr(item, "duration")) {
-        playback_info->duration = val;
+int set_playback_info_item(airplay_video_t *airplay_video, const char *item, int num, float *val) {
+    playback_info_t *playback_info = airplay_video->playback_info;
+    if (strstr(item, "duration")) {
+        playback_info->duration = *val;
     } else if (strstr(item, "position")) {
-        playback_info->position = val;
+        playback_info->position = *val;
     } else if (strstr(item, "rate")) {
-        playback_info->rate = val;
+        playback_info->rate = *val;
     } else if (strstr(item, "readyToPlay")) {
-        playback_info->readyToPlay  = (val ? true : false);
+      playback_info->readyToPlay  = !!num;
     } else if (strstr(item, "playbackBufferEmpty")) {
-        playback_info->playbackBufferEmpty  = (val ? true : false);
+        playback_info->playbackBufferEmpty  = !!num;
     } else if (strstr(item, "playbackBufferFull")) {
-        playback_info->playbackBufferFull  = (val ? true : false);
+        playback_info->playbackBufferFull  = !!num;
     } else if (strstr(item, "playbackLikelyToKeepUp")) {
-        playback_info->playbackLikelyToKeepUp  = (val ? true : false);
+        playback_info->playbackLikelyToKeepUp  = !!num;
     } else if (strstr(item, "loadedTimeRanges")) {
-        int num = (int) val;
         if (num < 0 || num > MAX_TIME_RANGES) {
 	    return -1;
         }
         playback_info->num_loaded_time_ranges = num;
     } else if (strstr(item, "seekableTimeRanges")) {
-        int num = (int) val;
         if (num < 0 || num > MAX_TIME_RANGES) {
 	    return -1;
         }
-        playback_info->num_seekable_time_ranges  = (int) val;
+        playback_info->num_seekable_time_ranges  = num;
     } else {
         return -1;    
     }
@@ -141,9 +140,11 @@ int set_playback_info_item(playback_info_t *playback_info, const char *item, dou
 // MAX_TIME_RANGES of a give typen may be added.
 // returns 0 for success, -1 for failure.
 
-int add_playback_info_time_range(playback_info_t *playback_info, const char *time_range_type, double duration, double start) {
+
+int add_playback_info_time_range(airplay_video_t *airplay_video, const char *time_range_type, double duration, double start) {
     time_range_t *time_range;
     int *time_range_num;
+    playback_info_t *playback_info = airplay_video->playback_info;
     if (!strstr(time_range_type, "loadedTimeRange")) {
         time_range_num = &playback_info->num_loaded_time_ranges;
         time_range = (time_range_t *) &playback_info->loadedTimeRanges[*time_range_num];
@@ -164,24 +165,26 @@ int add_playback_info_time_range(playback_info_t *playback_info, const char *tim
 }
 
 
+
+
 // this allows the entries in playback_info to be updated.
 
 static
 void initialize_playback_info(airplay_video_t *airplay_video) {
     int ret = 0;  
-    playback_info_t * playback_info = (playback_info_t *) &(airplay_video->playback_info);
-    ret += set_playback_info_item(playback_info, "duration", 0);
-    ret += set_playback_info_item(playback_info, "position", 0);
-    ret += set_playback_info_item(playback_info, "rate", 0);
-    ret += set_playback_info_item(playback_info, "readyToPlay", 0);
-    ret += set_playback_info_item(playback_info, "playbackBufferEmpty",0);
-    ret += set_playback_info_item(playback_info, "playbackBufferFull", 0);
-    ret += set_playback_info_item(playback_info, "playbackLikelyToKeepUp", 1);
-    ret += set_playback_info_item(playback_info, "loadedTimeRanges", 0);
-    ret += set_playback_info_item(playback_info, "seekableTimeRanges", 0);
+    float val = 0.0f;
+    ret += set_playback_info_item(airplay_video, "duration", 0, &val);
+    ret += set_playback_info_item(airplay_video, "position", 0, &val);
+    ret += set_playback_info_item(airplay_video, "rate", 0, &val);
+    ret += set_playback_info_item(airplay_video, "readyToPlay", 0, NULL);
+    ret += set_playback_info_item(airplay_video, "playbackBufferEmpty", 1, NULL);
+    ret += set_playback_info_item(airplay_video, "playbackBufferFull", 0, NULL);
+    ret += set_playback_info_item(airplay_video, "playbackLikelyToKeepUp", 1, NULL);
+    ret += set_playback_info_item(airplay_video, "loadedTimeRanges", 0, NULL);
+    ret += set_playback_info_item(airplay_video, "seekableTimeRanges", 0, NULL);
 
     // for testing time_range code
-    //ret += add_playback_info_time_range(playback_info, "seekableTimeRange", 0.3,  0.3);
+    //ret += add_playback_info_time_range(airplay_video, "seekableTimeRange", 0.3,  0.3);
 
     if (ret) {
           logger_log(airplay_video->logger, LOGGER_ERR, "initialize_playback_info error");
@@ -426,7 +429,7 @@ airplay_video_service_destroy(airplay_video_t *airplay_video)
 
 /* (partially implemented) call to handle the "POST /play" request from client.*/
 
-void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, const char *location, double start_position) {
+void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, const char *location, float start_position) {
 
     printf("airplay_video_play %s, start_position %f\n", location, start_position);
 
@@ -443,6 +446,13 @@ void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, 
   //g_string_free(command, TRUE);
 }
 
+int check_session_id(airplay_video_t *airplay_video, const char *session_id) {
+    if(!strcmp(session_id, airplay_video->session_id)) {
+        return 0;
+    } else {
+        return -1;
+    }
+}
 
 /* unimplemented */
 
@@ -455,14 +465,9 @@ void airplay_video_stop(airplay_video_t *airplay_video, const char *session_id) 
 }
 
 
-// handles "POST /rate" requests
-// equivalen code is service/casting_media_data_store: pro
-void airplay_video_rate(airplay_video_t *airplay_video, const char *session_id, double rate) {
-
-}
 
 
 //handles "POST /scrub" reuests
-void airplay_video_scrub( airplay_video_t *airplay_video, const char *session_id, double scrub_position) {
+void airplay_video_scrub( airplay_video_t *airplay_video, const char *session_id, float scrub_position) {
 }
 

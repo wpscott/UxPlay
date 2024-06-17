@@ -86,7 +86,7 @@ static void
 http_handler_get_property(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                           char **response_data, int *response_datalen) {
     const char *url = http_request_get_url(request);
-    const char *property = strstr(url, "/setProperty?") + 1;
+    const char *property = url + strlen("getProperty?");
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_get_property: %s (unhandled)", property);
 }
 
@@ -115,22 +115,24 @@ static void
 http_handler_rate(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                   char **response_data, int *response_datalen) {
 
+    const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
+    assert(!check_session_id(conn->airplay_video, session_id));
     const char *url = http_request_get_url(request);
     const char *data = strstr(url, "?");
-    double rate_value = 0.0;
+    float rate_value = 0.0f;
     if (data) {
         data++;
 	const char *rate = strstr(data, "=") + 1;
 	char *end;
 	double value = strtod(rate, &end);
 	if (end && end != rate) {
-	  rate_value = value;
-	  logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_rate: got rate = %f", rate_value);	  
+	  rate_value = (float) value;
+          set_playback_info_item(conn->airplay_video, "rate", 0, &rate_value);
+	  logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_rate: got rate = %.6f", rate_value);	  
 	}
     }
 
-    const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
-    airplay_video_rate(conn->airplay_video, session_id, rate_value);
+
 }
 
 static void
@@ -170,12 +172,12 @@ http_handler_set_property(raop_conn_t *conn,
 			  char **response_data, int *response_datalen) {
 
     const char *url = http_request_get_url(request);
-    const char *property = strstr(url, "/setProperty?") + 1;
+    const char *property = url + strlen("/setProperty?");
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_set_property: %s", property);
 
-    if (!strcmp(url, "reverseEndTime") ||
-        !strcmp(url, "forwardEndTime") ||
-        !strcmp(url, "actionAtItemEnd")) {
+    if (!strcmp(property, "reverseEndTime") ||
+        !strcmp(property, "forwardEndTime") ||
+        !strcmp(property, "actionAtItemEnd")) {
         logger_log(conn->raop->logger, LOGGER_DEBUG, "property %s is known but unhandled", property);
       
         plist_t errResponse = plist_new_dict();
@@ -366,7 +368,9 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
       goto post_action_error;
     }
 
-    char *location = process_media_data(media_data_store, fcup_response_url, fcup_response_data, fcup_response_datalen); 
+    printf("**************process_media_data**************\n");
+    char *location = process_media_data(media_data_store, fcup_response_url, fcup_response_data, fcup_response_datalen);
+    printf("********  process_media_data return location = \"%s\"  *************************\n", location);
     /* play, if location != NULL */
     if (location) {
       const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
