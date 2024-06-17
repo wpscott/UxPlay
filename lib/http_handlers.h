@@ -219,6 +219,10 @@ http_handler_reverse(raop_conn_t *conn, http_request_t *request, http_response_t
         logger_log(conn->raop->logger, LOGGER_DEBUG, "will use socket %d for %s connections", socket_fd, purpose);
         http_response_destroy(response);
         response = http_response_init("HTTP/1.1", 101, "Switching Protocols");
+	http_response_add_header(response, "Connection", "Upgrade");
+	http_response_add_header(response, "Upgrade", "PTTH/1.0");
+
+	
     } else {
         logger_log(conn->raop->logger, LOGGER_ERR, "multiple TPPH connections (%d) are forbidden", type_PTTH );
     }    

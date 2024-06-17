@@ -382,6 +382,10 @@ httpd_thread(void *arg)
                 connection->request = http_request_init();
                 assert(connection->request);
                 new_request = 1;
+                if (connection->type == CONNECTION_TYPE_PTTH) {
+                    http_request_is_reverse(connection->request);
+                }
+		printf("new request, connection %d, socket %d\n", i, connection->socket_fd);
             } else {
                 new_request = 0;
 	    }
@@ -409,7 +413,7 @@ httpd_thread(void *arg)
                 int readstart = 0;
                 new_request = 0;
                 while (readstart < 8) {
-                    ret = recv(connection->socket_fd, buffer + readstart, sizeof(buffer) - readstart, 0);
+                    ret = recv(connection->socket_fd, buffer + readstart, sizeof(buffer) - 1 - readstart, 0);
                     if (ret == 0) {
                         logger_log(httpd->logger, LOGGER_INFO, "Connection closed for socket %d", connection->socket_fd);
                         httpd_remove_connection(httpd, connection);
@@ -422,24 +426,19 @@ httpd_thread(void *arg)
                     http_request_set_reverse(connection->request);  
                 }
             } else {
-                ret = recv(connection->socket_fd, buffer, sizeof(buffer), 0);
+                ret = recv(connection->socket_fd, buffer, sizeof(buffer) - 1, 0);
                 if (ret == 0) {
                     logger_log(httpd->logger, LOGGER_INFO, "Connection closed for socket %d", connection->socket_fd);
                     httpd_remove_connection(httpd, connection);
                     continue;
                 }
             }
-
             if (http_request_is_reverse(connection->request)) {
                 /* this is a reverse response from the client to a GET /event reverse request from the server */
-                if (ret) {
-                    http_request_add_data(connection->request, buffer, ret);
-                } else if (logger_debug) {
-                    int datalen = 0;
-                    const char *data = http_request_get_data(connection->request, &datalen);
-                    char *reverse_response = utils_data_to_text(data, datalen);
-                    logger_log(httpd->logger, LOGGER_INFO, "reverse-http response from client:\n%s", reverse_response);
-                    free(reverse_response);
+                if (ret && logger_debug) {
+		    buffer[ret] = '\0';
+		    logger_log(httpd->logger, LOGGER_INFO, "<<<< received response from client (reversed HTTP = \"PTTH/1.0\") connection"
+			       " on socket %d:\n%s\n", connection->socket_fd, buffer);
                 }
                 if (ret == 0) {
                     httpd_remove_connection(httpd, connection);
