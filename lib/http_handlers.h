@@ -116,7 +116,7 @@ http_handler_rate(raop_conn_t *conn, http_request_t *request, http_response_t *r
                   char **response_data, int *response_datalen) {
 
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
-    assert(!check_session_id(conn->airplay_video, session_id));
+    assert(!verify_session_id(conn->airplay_video, session_id));
     const char *url = http_request_get_url(request);
     const char *data = strstr(url, "?");
     float rate_value = 0.0f;

@@ -94,6 +94,7 @@ static time_range_t seekable_time_ranges[MAX_TIME_RANGES];
 
 int set_playback_info_item(airplay_video_t *airplay_video, const char *item, int num, float *val) {
     playback_info_t *playback_info = airplay_video->playback_info;
+    return 0;
     if (strstr(item, "duration")) {
         playback_info->duration = *val;
     } else if (strstr(item, "position")) {
@@ -316,10 +317,10 @@ airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *
     media_data_store = media_data_store_create(conn_opaque, http_port);
     logger_log(logger, LOGGER_DEBUG, "airplay_video_service_init: media_data_store created at %p", media_data_store);
     set_media_data_store(raop, media_data_store);
-    set_session_id(media_data_store, session_id);
 
-
+    printf ("hello  playback_info\n");
     initialize_playback_info(airplay_video);
+    printf("bye\n");
     //    char *plist_xml;
     //airplay_video_acquire_playback_info(airplay_video, "session_id", &plist_xml);   
     //printf("%s\n", plist_xml);
@@ -446,7 +447,7 @@ void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, 
   //g_string_free(command, TRUE);
 }
 
-int check_session_id(airplay_video_t *airplay_video, const char *session_id) {
+int verify_session_id(airplay_video_t *airplay_video, const char *session_id) {
     if(!strcmp(session_id, airplay_video->session_id)) {
         return 0;
     } else {

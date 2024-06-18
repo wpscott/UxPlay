@@ -64,5 +64,5 @@ void set_start_pos_in_ms(void *media_data_store, float start_pos_in_ms);
 int get_fcup_request_id(void *media_data_store);
 void set_socket_fd(void *media_data_store, int socket_fd);
 int get_socket_fd(void *media_data_store);
-int check_session_id(airplay_video_t *airplay_video, const char *session_id);
+int verify_session_id(airplay_video_t *airplay_video, const char *session_id);
 #endif //AIRPLAY_VIDEO_H
