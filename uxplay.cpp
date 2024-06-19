@@ -1769,6 +1769,43 @@ extern "C" bool check_register(void *cls, const char *client_pk) {
         return false;
     }
 }
+/* control  callbacks for video player (unimplemented) */
+
+extern "C" void on_video_play(void *cls, const char* location, const float start_position) {
+    char play_cmd[] = "nohup gst-launch-1.0 playbin uri=";
+
+    LOGI("on_video_play: location %s start_pos = %7.5f\n", location, start_position);
+
+    size_t len = strlen(play_cmd) + strlen(location) + 3;
+    char *command = (char *) calloc(len, sizeof(char));
+    strncat(command, play_cmd, len);
+    strncat(command, location, len);
+    strncat(command, " &", len);
+    LOGI("HLS player command is: \"%s\"", command);
+    //system(command);
+    free  (command);
+}
+
+extern "C" void on_video_scrub(void *cls, const float position) {
+    LOGI("on_video_scrub: position = %7.5f\n", position);
+}
+
+extern "C" void on_video_rate(void *cls, const float value) {
+    LOGI("on_video_rate = %7.5f\n", value);
+}
+
+extern "C" void on_video_stop(void *cls) {
+    LOGI("on_video_stop\n");
+}
+
+extern "C" void on_video_acquire_playback_info (void *cls, playback_info_t *playback_info) {
+    LOGI("on_video_acquire_playback info %p\n", playback_info);
+    /* values used in apsdk-public demo */
+    playback_info->duration =  18 ;
+    playback_info->position =  32 ;
+    playback_info->rate =  1;
+    playback_info->ready_to_play = 1 ;
+}
 
 extern "C" void log_callback (void *cls, int level, const char *msg) {
     switch (level) {
@@ -1817,7 +1854,12 @@ static int start_raop_server (unsigned short display[5], unsigned short tcp[3], 
     raop_cbs.register_client = register_client;
     raop_cbs.check_register = check_register;
     raop_cbs.export_dacp = export_dacp;
-
+    raop_cbs.on_video_play = on_video_play;
+    raop_cbs.on_video_scrub = on_video_scrub;
+    raop_cbs.on_video_rate = on_video_rate;
+    raop_cbs.on_video_stop = on_video_stop;
+    raop_cbs.on_video_acquire_playback_info = on_video_acquire_playback_info;
+    
     raop = raop_init(&raop_cbs);
     if (raop == NULL) {
         LOGE("Error initializing raop!");
