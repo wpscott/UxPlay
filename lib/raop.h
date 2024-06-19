@@ -45,8 +45,8 @@ typedef struct time_range_s {
 #define MAX_TIME_RANGES 10
 
 typedef struct playback_info_s {
-    char * uuid;
-    uint32_t stallCount;
+  //char * uuid;
+    uint32_t stallcount;
     double duration;
     float position;
     double rate;

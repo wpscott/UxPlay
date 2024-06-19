@@ -144,21 +144,142 @@ http_handler_fpsetup2(raop_conn_t *conn, http_request_t *request, http_response_
 }
 
 
+
+
+
+// called by http_handler_playback_info to respond to a GET /playback_info request from the client.
+
+int create_playback_info_plist_xml(playback_info_t *playback_info, char **plist_xml) {
+
+    plist_t res_root_node = plist_new_dict();
+
+    plist_t duration_node = plist_new_real(playback_info->duration);
+    plist_dict_set_item(res_root_node, "duration", duration_node);
+
+    plist_t position_node = plist_new_real(playback_info->position);
+    plist_dict_set_item(res_root_node, "position", position_node);
+
+    plist_t rate_node = plist_new_real(playback_info->rate);
+    plist_dict_set_item(res_root_node, "rate", rate_node);
+
+    /* should these be int or bool? */
+    plist_t ready_to_play_node = plist_new_int(playback_info->ready_to_play);
+    plist_dict_set_item(res_root_node, "readyToPlay", ready_to_play_node);
+
+    plist_t playback_buffer_empty_node = plist_new_int(playback_info->playback_buffer_empty);
+    plist_dict_set_item(res_root_node, "playbackBufferEmpty", playback_buffer_empty_node);
+
+    plist_t playback_buffer_full_node = plist_new_int(playback_info->playback_buffer_full);
+    plist_dict_set_item(res_root_node, "playbackBufferFull", playback_buffer_full_node);
+
+    plist_t playback_likely_to_keep_up_node = plist_new_int(playback_info->playback_likely_to_keep_up);
+    plist_dict_set_item(res_root_node, "playbackLikelyToKeepUp", playback_likely_to_keep_up_node);
+
+    plist_t loaded_time_ranges_node = plist_new_array();
+
+    printf("num_loaded_time_ranges %d\n",playback_info->num_loaded_time_ranges);
+    
+    for (int i = 0 ; i < playback_info->num_loaded_time_ranges; i++) {
+        assert (i < MAX_TIME_RANGES);
+	time_range_t *time_range = &playback_info->loadedTimeRanges[i];
+        plist_t time_range_node = plist_new_dict();
+        plist_t duration_node = plist_new_real( time_range->duration);
+        plist_dict_set_item(time_range_node, "duration", duration_node);
+        plist_t start_node = plist_new_real( time_range->start);
+        plist_dict_set_item(time_range_node, "start", start_node);
+        plist_array_append_item(loaded_time_ranges_node, time_range_node);
+    }
+    plist_dict_set_item(res_root_node, "loadedTimeRanges", loaded_time_ranges_node);
+
+    plist_t seekable_time_ranges_node = plist_new_array();
+    for (int i = 0 ; i < playback_info->num_seekable_time_ranges; i++) {
+        assert (i < MAX_TIME_RANGES);
+	time_range_t *time_range = &playback_info->loadedTimeRanges[i];
+        plist_t time_range_node = plist_new_dict();
+        plist_t duration_node = plist_new_real(time_range->duration);
+        plist_dict_set_item(time_range_node, "duration", duration_node);
+        plist_t start_node = plist_new_real(time_range->start);
+        plist_dict_set_item(time_range_node, "start", start_node);
+        plist_array_append_item(seekable_time_ranges_node, time_range_node);
+    }
+    plist_dict_set_item(res_root_node, "seekableTimeRanges", seekable_time_ranges_node);
+
+    int len;
+    plist_to_xml(res_root_node, plist_xml, (uint32_t *) &len);
+    plist_free(res_root_node);
+
+
+    /* remove a final /n (suggested by apssk-public code):  is this necessary when using plist_to_xml? */
+    len --;
+    (*plist_xml)[len] = '\0';
+    
+    // printf("[%s]", *plist_xml);
+    
+    
+    return len;
+}
+
+
+// this adds a time range (duration, start) of time-range_type = "loadedTimeRange" or "seekableTimeRange"
+// to the playback info struc, and increments the appropiate counter by 1.  Not more than
+// MAX_TIME_RANGES of a give typen may be added.
+// returns 0 for success, -1 for failure.
+
+int add_playback_info_time_range(playback_info_t *playback_info, const char *time_range_type, double duration, double start) {
+    time_range_t *time_range;
+    int *time_range_num;
+     if (!strstr(time_range_type, "loadedTimeRange")) {
+        time_range_num = &(playback_info->num_loaded_time_ranges);
+        time_range = (time_range_t *) &playback_info->loadedTimeRanges[*time_range_num];
+    } else if (!strstr(time_range_type, "seekableTimeRange")) {
+        time_range_num = &(playback_info->num_seekable_time_ranges);
+        time_range = (time_range_t *) &playback_info->seekableTimeRanges[*time_range_num];
+    } else {
+        return -1;
+    }
+    
+    if (*time_range_num == MAX_TIME_RANGES) {
+        return -1;
+    }
+
+    time_range->duration = duration;
+    time_range->start = start;
+    (*time_range_num)++;
+    return 0;
+}
+
 static void
-http_handler_playback_info(raop_conn_t *conn,
-                      http_request_t *request, http_response_t *response,
-                      char **response_data, int *response_datalen)
+http_handler_playback_info(raop_conn_t *conn, http_request_t *request, http_response_t *response,
+                           char **response_data, int *response_datalen)
 {
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_playback_info");
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
-    
-    *response_datalen  =  airplay_video_acquire_playback_info(conn->airplay_video, session_id, response_data);
 
+    
+    playback_info_t playback_info;
+    playback_info.stallcount = 0;
+    playback_info.duration = 0.0;
+    playback_info.position =  0.0f;
+    playback_info.ready_to_play = false;
+    playback_info.playback_buffer_empty = true;
+    playback_info.playback_buffer_full = false;
+    playback_info.playback_likely_to_keep_up = true;
+    playback_info.num_loaded_time_ranges = 0;
+    playback_info.num_seekable_time_ranges = 0;
+    
+    
+    conn->raop->callbacks.on_video_acquire_playback_info(conn->raop->callbacks.cls, &playback_info);
+    add_playback_info_time_range(&playback_info, "loadedTimeRange", playback_info.duration, 0.0);
+    add_playback_info_time_range(&playback_info, "seekableTimeRange", playback_info.duration, 0.0);
+
+
+    *response_datalen =  create_playback_info_plist_xml(&playback_info, response_data);
     /* last character (at *response_data[response_datalen - 1]) is  0x0a = '\n'
      * (*response_data[response_datalen] is '\0').
      * apsdk removes the last "\n" by overwriting it with '\0', and reducing response_datalen by 1. 
      * TODO: check if this is necessary  */
 
+    
     http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
 }
 
@@ -315,7 +436,7 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
     free (type);
 
 
-    
+    uint32_t n_items;
     plist_t req_params_node = NULL;
     switch (action_type) {
     case 1:
@@ -336,6 +457,22 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
     }
     
     handle_fcup:
+#if 0
+    n_items =  plist_dict_get_size(req_params_node);
+    plist_dict_iter iter;
+    plist_dict_new_iter(req_params_node, &iter);
+    printf("params is a plist_dict with size %u \n", n_items);
+    for (int i = 0 ; i < (int) n_items; i++) {
+      char *key = NULL;
+      plist_dict_next_item(req_params_node, iter, &key, NULL);
+      printf("Item %d has key %s\n", i, key);
+      if(key){
+          free(key);
+      }
+    }
+    free (iter);
+#endif
+    
     /* handling type "unhandledURLResponse" (case 1)*/
     uint_val = 0;
     int fcup_response_datalen = 0;
@@ -349,12 +486,9 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
         plist_get_uint_val(plist_fcup_response_statuscode_node, &uint_val);
         fcup_response_statuscode = (int) uint_val;
         uint_val = 0;
-        if (!fcup_response_statuscode) {
-            logger_log(conn->raop->logger, LOGGER_INFO, "unhandledURLResponse with non-zero FCUP_Response_StatusCode = %d",
-                       fcup_response_statuscode);
-            //goto post_action_error;
-        }
+        logger_log(conn->raop->logger, LOGGER_INFO, "FCUP_Response_StatusCode = %d", fcup_response_statuscode);
     }
+    
 
     plist_t plist_fcup_response_requestid_node = plist_dict_get_item(req_params_node, "FCUP_Response_RequestID");
     if (plist_fcup_response_requestid_node) {
@@ -366,42 +500,47 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
 
     
     plist_t plist_fcup_response_url_node = plist_dict_get_item(req_params_node, "FCUP_Response_URL");
-    plist_get_string_val(plist_fcup_response_url_node, &fcup_response_url);
-    if (!fcup_response_url) {
-        goto post_action_error;
+    if (plist_fcup_response_url_node) {
+        plist_get_string_val(plist_fcup_response_url_node, &fcup_response_url);
+        if (!fcup_response_url) {
+            goto post_action_error;
+        }
+        logger_log(conn->raop->logger, LOGGER_DEBUG, "FCUP_Response_URL =  %s");
     }
 
+	
     plist_t plist_fcup_response_data_node = plist_dict_get_item(req_params_node, "FCUP_Response_Data");
     if (!PLIST_IS_DATA(plist_fcup_response_data_node)){
-      goto post_action_error;
+        goto post_action_error;
     } else {
-      plist_get_data_val(plist_fcup_response_data_node, &fcup_response_data, &uint_val);
-      fcup_response_datalen = (int) uint_val;
-      uint_val = 0;
-      
-      int count = 0;
-      char * ptr = fcup_response_data;
-      const char blk[] = "#EXT-X-";
-	for (int i = 0; i < fcup_response_datalen; i++) {
-	  if (!strncmp(ptr,blk, strlen(blk))) {
-	    printf("\n");
-	    count = 0;
-	  }
-	  count++;
-	  printf("%c",  *ptr);
-	  ptr++;
-	  if (count%80 == 79) {
-	    printf("\n");
-	  }
-	}
-      printf("\n");
-    
-      printf("*** datalen = %d\n", fcup_response_datalen);
-      
-      if (!fcup_response_datalen) {
-	free (fcup_response_url);
-	goto post_action_error;
-      }
+        plist_get_data_val(plist_fcup_response_data_node, &fcup_response_data, &uint_val);
+        fcup_response_datalen = (int) uint_val;
+        uint_val = 0;
+	
+        if (logger_get_level(conn->raop->logger) >= LOGGER_DEBUG) {
+            int count = 0;
+            char * ptr = fcup_response_data;
+            const char blk[] = "#EXT-X-";
+            for (int i = 0; i < fcup_response_datalen; i++) {
+                if (!strncmp(ptr,blk, strlen(blk))) {
+                    printf("\n");
+                    count = 0;
+                }
+                count++;
+                printf("%c",  *ptr);
+                ptr++;
+                if (count%80 == 79) {
+                    printf("\n");
+                }
+            }
+            printf("\n");
+        }
+	free (fcup_response_data);
+        printf("*** datalen = %d\n", fcup_response_datalen);
+        if (!fcup_response_datalen) {
+	    free (fcup_response_url);
+	    goto post_action_error;
+        }
     }
     
 

@@ -1782,7 +1782,10 @@ extern "C" void on_video_play(void *cls, const char* location, const float start
     strncat(command, location, len);
     strncat(command, " &", len);
     LOGI("HLS player command is: \"%s\"", command);
-    //system(command);
+    
+    /* start  playbin */
+    system(command);
+
     free  (command);
 }
 
@@ -1801,8 +1804,8 @@ extern "C" void on_video_stop(void *cls) {
 extern "C" void on_video_acquire_playback_info (void *cls, playback_info_t *playback_info) {
     LOGI("on_video_acquire_playback info %p\n", playback_info);
     /* values used in apsdk-public demo */
-    playback_info->duration =  18 ;
-    playback_info->position =  32 ;
+    playback_info->duration =  32 ;
+    playback_info->position =  18 ;
     playback_info->rate =  1;
     playback_info->ready_to_play = 1 ;
 }

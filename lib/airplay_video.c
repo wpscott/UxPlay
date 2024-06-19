@@ -65,10 +65,6 @@ struct airplay_video_s {
 };
 
 
-static playback_info_t playback_info_static;
-
-static time_range_t loaded_time_ranges[MAX_TIME_RANGES];
-static time_range_t seekable_time_ranges[MAX_TIME_RANGES];
 
 int set_playback_info_item(airplay_video_t *airplay_video, const char *item, int num, float *val) {
     playback_info_t *playback_info = airplay_video->playback_info;
@@ -103,137 +99,6 @@ int set_playback_info_item(airplay_video_t *airplay_video, const char *item, int
     return 0;
 }
 
-/* to add a new time_range to a playback_info_t struct::
- *    e.g.:  add_playback_info_time_range(playback_info, "loadedTimeRange", 65.5,  12.3);
- *    where duration = 65.5 secs, start = 12.3 secs: returns 0 if success, -1 if fail.
- *    This adds a  new loadedTimeRange at  playback_info->loadedTimeRange[num]
- *    where num is playback_info->num_loaded_time_ranges prior to the call.
- *    attempts to add another time_range if num == MAX_TIME_RANGES will fail
- *    
- *    Replace "loaded" by "seekable" for handling a seekableTimeRange.
- */
-
-
-// this adds a time range (duration, start) of time-range_type = "loadedTimeRange" or "seekableTimeRange"
-// to the playback info struc, and increments the appropiate counter by 1.  Not more than
-// MAX_TIME_RANGES of a give typen may be added.
-// returns 0 for success, -1 for failure.
-
-
-int add_playback_info_time_range(airplay_video_t *airplay_video, const char *time_range_type, double duration, double start) {
-    time_range_t *time_range;
-    int *time_range_num;
-    playback_info_t *playback_info = airplay_video->playback_info;
-    if (!strstr(time_range_type, "loadedTimeRange")) {
-        time_range_num = &playback_info->num_loaded_time_ranges;
-        time_range = (time_range_t *) &playback_info->loadedTimeRanges[*time_range_num];
-    } else if (!strstr(time_range_type, "seekableTimeRange")) {
-        time_range_num = &playback_info->num_seekable_time_ranges;
-        time_range = (time_range_t *) &playback_info->seekableTimeRanges[*time_range_num];
-    } else {
-        return -1;
-    }
-    
-    if (*time_range_num == MAX_TIME_RANGES) {
-        return -1;
-    }
-    time_range->duration = duration;
-    time_range->start = start;
-    (*time_range_num)++;
-    return 0;
-}
-
-
-
-
-// this allows the entries in playback_info to be updated.
-
-static
-void initialize_playback_info(airplay_video_t *airplay_video) {
-    int ret = 0;  
-    float val = 0.0f;
-    ret += set_playback_info_item(airplay_video, "duration", 0, &val);
-    ret += set_playback_info_item(airplay_video, "position", 0, &val);
-    ret += set_playback_info_item(airplay_video, "rate", 0, &val);
-    ret += set_playback_info_item(airplay_video, "readyToPlay", 0, NULL);
-    ret += set_playback_info_item(airplay_video, "playbackBufferEmpty", 1, NULL);
-    ret += set_playback_info_item(airplay_video, "playbackBufferFull", 0, NULL);
-    ret += set_playback_info_item(airplay_video, "playbackLikelyToKeepUp", 1, NULL);
-    ret += set_playback_info_item(airplay_video, "loadedTimeRanges", 0, NULL);
-    ret += set_playback_info_item(airplay_video, "seekableTimeRanges", 0, NULL);
-
-    // for testing time_range code
-    //ret += add_playback_info_time_range(airplay_video, "seekableTimeRange", 0.3,  0.3);
-
-    if (ret) {
-          logger_log(airplay_video->logger, LOGGER_ERR, "initialize_playback_info error");
-    }
-}
-
-
-// called by http_handler_playback_info to respond to a GET /playback_info request from the client.
-
-int airplay_video_acquire_playback_info(airplay_video_t *airplay_video, const char *session_id, char **plist_xml) {
-
-    playback_info_t *playback_info  = (playback_info_t*) &airplay_video->playback_info;
-    printf ("playback_info %p\n", playback_info);
-    plist_t res_root_node = plist_new_dict();
-
-    plist_t duration_node = plist_new_real(playback_info->duration);
-    plist_dict_set_item(res_root_node, "duration", duration_node);
-
-    plist_t position_node = plist_new_real(playback_info->position);
-    plist_dict_set_item(res_root_node, "position", position_node);
-
-    plist_t rate_node = plist_new_real(playback_info->rate);
-    plist_dict_set_item(res_root_node, "rate", rate_node);
-
-    plist_t ready_to_play_node = plist_new_bool(playback_info->ready_to_play);
-    plist_dict_set_item(res_root_node, "readyToPlay", ready_to_play_node);
-
-    plist_t playback_buffer_empty_node = plist_new_bool(playback_info->playback_buffer_empty);
-    plist_dict_set_item(res_root_node, "playbackBufferEmpty", playback_buffer_empty_node);
-
-    plist_t playback_buffer_full_node = plist_new_bool(playback_info->playback_buffer_full);
-    plist_dict_set_item(res_root_node, "playbackBufferFull", playback_buffer_full_node);
-
-    plist_t playback_likely_to_keep_up_node = plist_new_bool(playback_info->playback_likely_to_keep_up);
-    plist_dict_set_item(res_root_node, "playbackLikelyToKeepUp", playback_likely_to_keep_up_node);
-
-    plist_t loaded_time_ranges_node = plist_new_array();
-
-    printf("num_loaded_time_ranges %d\n",playback_info->num_loaded_time_ranges);
-    
-    for (int i = 0 ; i < playback_info->num_loaded_time_ranges; i++) {
-        assert (i < MAX_TIME_RANGES);
-	time_range_t *time_range = &playback_info->loadedTimeRanges[i];
-        plist_t time_range_node = plist_new_dict();
-        plist_t duration_node = plist_new_real( time_range->duration);
-        plist_dict_set_item(time_range_node, "duration", duration_node);
-        plist_t start_node = plist_new_real( time_range->start);
-        plist_dict_set_item(time_range_node, "start", start_node);
-        plist_array_append_item(loaded_time_ranges_node, time_range_node);
-    }
-    plist_dict_set_item(res_root_node, "loadedTimeRanges", loaded_time_ranges_node);
-
-    plist_t seekable_time_ranges_node = plist_new_array();
-    for (int i = 0 ; i < playback_info->num_seekable_time_ranges; i++) {
-        assert (i < MAX_TIME_RANGES);
-	time_range_t *time_range = &playback_info->loadedTimeRanges[i];
-        plist_t time_range_node = plist_new_dict();
-        plist_t duration_node = plist_new_real(time_range->duration);
-        plist_dict_set_item(time_range_node, "duration", duration_node);
-        plist_t start_node = plist_new_real(time_range->start);
-        plist_dict_set_item(time_range_node, "start", start_node);
-        plist_array_append_item(seekable_time_ranges_node, time_range_node);
-    }
-    plist_dict_set_item(res_root_node, "seekableTimeRanges", seekable_time_ranges_node);
-
-    uint32_t len;
-    plist_to_xml(res_root_node, plist_xml, &len);
-    plist_free(res_root_node);
-    return (int) len;
-}
 
 
 // a thread for the airplay_video server, (may not be necessary, but included in case it is)
@@ -295,8 +160,6 @@ airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *
     media_data_store = media_data_store_create(conn_opaque, http_port);
     logger_log(logger, LOGGER_DEBUG, "airplay_video_service_init: media_data_store created at %p", media_data_store);
     set_media_data_store(raop, media_data_store);
-
-    initialize_playback_info(airplay_video);
 
     //    char *plist_xml;
     //airplay_video_acquire_playback_info(airplay_video, "session_id", &plist_xml);   
