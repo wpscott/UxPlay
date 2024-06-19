@@ -101,8 +101,6 @@ private:
   std::string primary_uri_;
   std::stack<std::string> uri_stack_;
 
-  std::string playback_uuid_;
-  float start_pos_in_ms_;
   std::string host_;
   media_data media_data_;
   std::mutex mtx_;
@@ -117,26 +115,6 @@ public:
   static MediaDataStore &get();
 
   void set_store_root(void *conn, uint16_t port); 
-
-  bool check_session_id(std::string session_id) {
-    return  (session_id_ == session_id);
-  }
-    
-  void set_session_id(const char * session_id) {
-    session_id_ = session_id;
-  }
-
-  void set_playback_uuid(const char * playback_uuid) {
-    playback_uuid_ = playback_uuid;
-  }
-
-  float get_start_pos_in_ms() {
-    return start_pos_in_ms_;
-  }
-  
-  void set_start_pos_in_ms(float start_pos_in_ms) {
-    start_pos_in_ms_ = start_pos_in_ms;
-  }
 
   // request media data from client side
   bool request_media_data(const std::string &primary_uri, const std::string &session_id);
