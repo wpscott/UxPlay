@@ -27,7 +27,11 @@ typedef struct airplay_video_s airplay_video_t;
 
 int airplay_video_acquire_playback_info(airplay_video_t *airplay_video, const char *session_id, char **plist_xml);
 int set_playback_info_item(airplay_video_t *airplay_video, const char *item, int num, float *val);
-
+const char *get_apple_session_id(airplay_video_t *airplay_video);
+void set_start_position_seconds(airplay_video_t *airplay_video, float start_position_seconds);
+float get_start_position_seconds(airplay_video_t *airplay_video);
+void set_playback_uuid(airplay_video_t *airplay_video, const char *playback_uuid);
+  
 void airplay_video_stop(airplay_video_t *airplay_video, const char *session_id);
 void airplay_video_rate(airplay_video_t *airplay_video, const char *session_id, float rate);
 void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, const char *location, float start_position);
@@ -58,11 +62,4 @@ void media_data_store_reset(void *media_data_store);
 
 const char *adjust_primary_uri(void *media_data_store, const char *url);
   
-// set and get session_id_, start_pos_in_ms_, and playback_uuid_
-float get_start_pos_in_ms(void *media_data_store);
-void set_start_pos_in_ms(void *media_data_store, float start_pos_in_ms);
-int get_fcup_request_id(void *media_data_store);
-void set_socket_fd(void *media_data_store, int socket_fd);
-int get_socket_fd(void *media_data_store);
-int verify_session_id(airplay_video_t *airplay_video, const char *session_id);
 #endif //AIRPLAY_VIDEO_H

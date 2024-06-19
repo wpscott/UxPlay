@@ -354,7 +354,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
             } else if (!strcmp(url, "/play")) {
                 handler = &http_handler_play;
             } else if (!strncmp (url, "/getProperty?", strlen("/getProperty?"))) {
-                handler = &http_handler_scrub;
+                handler = &http_handler_get_property;
             } else if (!strcmp(url, "/scrub")) {
                 handler = &http_handler_scrub;
             } else if (!strncmp(url, "/rate?", strlen("/rate?"))) {

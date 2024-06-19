@@ -37,6 +37,29 @@ typedef struct raop_s raop_t;
 
 typedef void (*raop_log_callback_t)(void *cls, int level, const char *msg);
 
+typedef struct time_range_s {
+  double start;
+  double duration;
+} time_range_t;
+
+#define MAX_TIME_RANGES 10
+
+typedef struct playback_info_s {
+    char * uuid;
+    uint32_t stallCount;
+    double duration;
+    float position;
+    double rate;
+    bool ready_to_play;
+    bool playback_buffer_empty;
+    bool playback_buffer_full;
+    bool playback_likely_to_keep_up;
+    int num_loaded_time_ranges;
+    int num_seekable_time_ranges;
+    time_range_t loadedTimeRanges[MAX_TIME_RANGES];
+    time_range_t seekableTimeRanges[MAX_TIME_RANGES];
+} playback_info_t;
+  
 struct raop_callbacks_s {
     void* cls;
 
@@ -64,6 +87,13 @@ struct raop_callbacks_s {
     void  (*register_client) (void *cls, const char *device_id, const char *pk_str, const char *name);
     bool  (*check_register) (void *cls, const char *pk_str);
     void  (*export_dacp) (void *cls, const char *active_remote, const char *dacp_id);
+    /* for HLS video player controls */
+    void  (*on_video_play) (void *cls, const char *location, const float start_position);
+    void  (*on_video_scrub) (void *cls, const float position);
+    void  (*on_video_rate) (void *cls, const float value);
+    void  (*on_video_stop) (void *cls);
+    void  (*on_video_acquire_playback_info) (void *cls, playback_info_t *playback_video);
+  
 };
 typedef struct raop_callbacks_s raop_callbacks_t;
 raop_ntp_t *raop_ntp_init(logger_t *logger, raop_callbacks_t *callbacks, const char *remote,

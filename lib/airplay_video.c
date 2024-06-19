@@ -37,40 +37,18 @@
 #include "utils.h"
 #include "airplay_video.h"
 
-#define MAX_TIME_RANGES 10
-
-typedef struct time_range_s {
-    float start;
-    float duration;
-} time_range_t;
-
-typedef struct playback_info_s {
-    // char * uuid
-    // uint32_t stallCount
-    float duration;
-    float position;
-    float rate;
-    bool readyToPlay;
-    bool playbackBufferEmpty;
-    bool playbackBufferFull;
-    bool playbackLikelyToKeepUp;
-    int num_loaded_time_ranges;
-    int num_seekable_time_ranges;
-    time_range_t loadedTimeRanges[MAX_TIME_RANGES];
-    time_range_t seekableTimeRanges[MAX_TIME_RANGES];
-} playback_info_t;
 
 struct airplay_video_s {
     raop_t *raop;
     logger_t *logger;
     raop_callbacks_t callbacks;
     void *conn_opaque;
-    char *session_id;
+    char apple_session_id[37];
+    char playback_uuid[37];
+    float start_position_seconds;
     playback_info_t *playback_info;
-  
     thread_handle_t thread;
     mutex_handle_t run_mutex;
-
     mutex_handle_t wait_mutex;
     cond_handle_t wait_cond;
 
@@ -102,13 +80,13 @@ int set_playback_info_item(airplay_video_t *airplay_video, const char *item, int
     } else if (strstr(item, "rate")) {
         playback_info->rate = *val;
     } else if (strstr(item, "readyToPlay")) {
-      playback_info->readyToPlay  = !!num;
+      playback_info->ready_to_play  = !!num;
     } else if (strstr(item, "playbackBufferEmpty")) {
-        playback_info->playbackBufferEmpty  = !!num;
+        playback_info->playback_buffer_empty  = !!num;
     } else if (strstr(item, "playbackBufferFull")) {
-        playback_info->playbackBufferFull  = !!num;
+        playback_info->playback_buffer_full  = !!num;
     } else if (strstr(item, "playbackLikelyToKeepUp")) {
-        playback_info->playbackLikelyToKeepUp  = !!num;
+        playback_info->playback_likely_to_keep_up  = !!num;
     } else if (strstr(item, "loadedTimeRanges")) {
         if (num < 0 || num > MAX_TIME_RANGES) {
 	    return -1;
@@ -210,16 +188,16 @@ int airplay_video_acquire_playback_info(airplay_video_t *airplay_video, const ch
     plist_t rate_node = plist_new_real(playback_info->rate);
     plist_dict_set_item(res_root_node, "rate", rate_node);
 
-    plist_t ready_to_play_node = plist_new_bool(playback_info->readyToPlay);
+    plist_t ready_to_play_node = plist_new_bool(playback_info->ready_to_play);
     plist_dict_set_item(res_root_node, "readyToPlay", ready_to_play_node);
 
-    plist_t playback_buffer_empty_node = plist_new_bool(playback_info->playbackBufferEmpty);
+    plist_t playback_buffer_empty_node = plist_new_bool(playback_info->playback_buffer_empty);
     plist_dict_set_item(res_root_node, "playbackBufferEmpty", playback_buffer_empty_node);
 
-    plist_t playback_buffer_full_node = plist_new_bool(playback_info->playbackBufferFull);
+    plist_t playback_buffer_full_node = plist_new_bool(playback_info->playback_buffer_full);
     plist_dict_set_item(res_root_node, "playbackBufferFull", playback_buffer_full_node);
 
-    plist_t playback_likely_to_keep_up_node = plist_new_bool(playback_info->playbackLikelyToKeepUp);
+    plist_t playback_likely_to_keep_up_node = plist_new_bool(playback_info->playback_likely_to_keep_up);
     plist_dict_set_item(res_root_node, "playbackLikelyToKeepUp", playback_likely_to_keep_up_node);
 
     plist_t loaded_time_ranges_node = plist_new_array();
@@ -311,16 +289,15 @@ airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *
     if (!airplay_video) {
         return NULL;
     }
-
+    
     /* destroy any existing media_data_store and create a new instance*/
     set_media_data_store(raop, media_data_store);  
     media_data_store = media_data_store_create(conn_opaque, http_port);
     logger_log(logger, LOGGER_DEBUG, "airplay_video_service_init: media_data_store created at %p", media_data_store);
     set_media_data_store(raop, media_data_store);
 
-    printf ("hello  playback_info\n");
     initialize_playback_info(airplay_video);
-    printf("bye\n");
+
     //    char *plist_xml;
     //airplay_video_acquire_playback_info(airplay_video, "session_id", &plist_xml);   
     //printf("%s\n", plist_xml);
@@ -332,10 +309,12 @@ airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *
     airplay_video->conn_opaque = conn_opaque;
 
     size_t len = strlen(session_id);
-    airplay_video->session_id = (char *) malloc(len + 1);
-    strncpy(airplay_video->session_id, session_id, len);
-    (airplay_video->session_id)[len] = '\0';
+    assert(len == 36);
+    strncpy(airplay_video->apple_session_id, session_id, len);
+    (airplay_video->apple_session_id)[len] = '\0';
 
+    airplay_video->start_position_seconds = 0.0f;
+    
     airplay_video->running = 0;
     airplay_video->joined = 1;
 
@@ -415,60 +394,27 @@ airplay_video_service_destroy(airplay_video_t *airplay_video)
     MUTEX_DESTROY(airplay_video->wait_mutex);
     COND_DESTROY(airplay_video->wait_cond);
 
-
     void* media_data_store = NULL;
     /* destroys media_data_store if called with media_data_store = NULL */
     set_media_data_store(airplay_video->raop, media_data_store);
     
-    if (airplay_video->session_id) {
-        free (airplay_video->session_id);
-    }
-    free(airplay_video);
 }
 
+const char *get_apple_session_id(airplay_video_t *airplay_video) {
+    return airplay_video->apple_session_id;
+}
 
+float get_start_position_seconds(airplay_video_t *airplay_video) {
+    return airplay_video->start_position_seconds;
+}
 
-/* (partially implemented) call to handle the "POST /play" request from client.*/
-
-void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, const char *location, float start_position) {
-
-    printf("airplay_video_play %s, start_position %f\n", location, start_position);
-
-    char play_cmd[] = "nohup gst-launch-1.0 playbin uri=";
-    size_t len = strlen(play_cmd) + strlen(location) + 3;
-    char *command = (char *) calloc(len, sizeof(char));
-    strncat(command, play_cmd, len);
-    strncat(command, location, len);
-    strncat(command, " &", len);
-    logger_log(airplay_video->logger, LOGGER_INFO, "HLS player command is: \"%s\"", command);
+void set_start_position_seconds(airplay_video_t *airplay_video, float start_position_seconds) {
+    airplay_video->start_position_seconds = start_position_seconds;
+}
   
-    system(command);
-    free  (command);
-  //g_string_free(command, TRUE);
+void set_playback_uuid(airplay_video_t *airplay_video, const char *playback_uuid) {
+    size_t len = strlen(playback_uuid);
+    assert(len == 36);
+    memcpy(airplay_video->playback_uuid, playback_uuid, len);
+    (airplay_video->playback_uuid)[len] = '\0';
 }
-
-int verify_session_id(airplay_video_t *airplay_video, const char *session_id) {
-    if(!strcmp(session_id, airplay_video->session_id)) {
-        return 0;
-    } else {
-        return -1;
-    }
-}
-
-/* unimplemented */
-
-
-
-// handles POST /stop requests
-// corresponds to on_video_sto
-void airplay_video_stop(airplay_video_t *airplay_video, const char *session_id) {
-
-}
-
-
-
-
-//handles "POST /scrub" reuests
-void airplay_video_scrub( airplay_video_t *airplay_video, const char *session_id, float scrub_position) {
-}
-
