@@ -188,14 +188,12 @@ conn_init(void *opaque, unsigned char *local, int locallen, unsigned char *remot
 static void
 conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     char *response_data = NULL;
-    const char *hls_response_data = NULL;
     int response_datalen = 0;
     raop_conn_t *conn = ptr;
-    bool free_response_data = true;
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "conn_request");
     bool logger_debug = (logger_get_level(conn->raop->logger) >= LOGGER_DEBUG);
-     
+
     /* 
     All requests arriving here have been parsed by llhttp to obtain 
     method | url | protocol (RTSP/1.0 or HTTP/1.1)
@@ -208,7 +206,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     (3) type HLS internal connections from the local HLS server (gstreamer) at localhost with neither 
         of these headers,  but a Host: localhost:[port] header.   method = GET.
      */
-    
+
     const char *method = http_request_get_method(request);
 
     if (!method) {
@@ -221,8 +219,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
     const char *client_session_id = http_request_get_header(request, "X-Apple-Session-ID");
     const char *host = http_request_get_header(request, "Host");
     bool hls_request =  (host && !cseq && !client_session_id);
-      
-    
+
     if (conn->connection_type == CONNECTION_TYPE_UNKNOWN) {
         if (cseq && httpd_count_connection_type(conn->raop->httpd, CONNECTION_TYPE_RAOP)) {
             char ipaddr[40];
@@ -249,7 +246,12 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
 
     /* this response code and message  will be modified by the handler if necessary */
     *response = http_response_init(protocol, 200, "OK");
-    
+
+    /* is this really necessary? or is it obsolete? (added for all RTSP requests EXCEPT "RECORD") */
+    if (cseq && strcmp(method, "RECORD")) {
+	    http_response_add_header(*response, "Audio-Jack-Status", "connected; type=digital");
+    }
+
     if (!conn->have_active_remote) {
         const char *active_remote = http_request_get_header(request, "Active-Remote");
         if (active_remote) {
@@ -260,7 +262,6 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
             }
         }
     }
-
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "\n%s %s %s", method, url, protocol);
     char *header_str= NULL; 
@@ -296,19 +297,12 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
         }
     }
 
-    /* is this really necessary? or is it obsolete? (move it to record_handler)*/
-    if (cseq && strcmp(method, "RECORD")) {
-	    http_response_add_header(*response, "Audio-Jack-Status", "connected; type=digital");
-    }
-
-
     if (client_session_id) {
         assert(!strcmp(client_session_id, conn->client_session_id));
     }
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "Handling request %s with URL %s", method, url);
     raop_handler_t handler = NULL;
-    hls_handler_t hls_handler = NULL;
     if (!hls_request && !strcmp(protocol, "RTSP/1.0")) {
         if (!strcmp(method, "POST")) {
             if (!strcmp(url, "/feedback")) {
@@ -379,43 +373,38 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
 	  }
         }
     } else if (hls_request) {
-        hls_handler = &http_handler_hls;
+        handler = &http_handler_hls;
     }
 
     if (handler != NULL) {
         handler(conn, request, *response, &response_data, &response_datalen);
-    } else if (hls_handler != NULL) {
-        hls_handler(conn, request, *response, &hls_response_data, &response_datalen);
-        http_response_finish(*response, hls_response_data, response_datalen);
     } else {
       logger_log(conn->raop->logger, LOGGER_INFO,
 		 "Unhandled Client Request: %s %s %s", method, url, protocol);
     }
 
     finish:;
-    if (hls_handler == NULL) {
+    if (!hls_request) {
         http_response_add_header(*response, "Server", "AirTunes/"GLOBAL_VERSION);
+        if (cseq) {
+            http_response_add_header(*response, "CSeq", cseq);
+	}
     }
-    if (cseq) {
-        http_response_add_header(*response, "CSeq", cseq);
-    }
-    
     http_response_finish(*response, response_data, response_datalen);
 
     int len;
     const char *data = http_response_get_data(*response, &len);
-    if ((response_data || hls_response_data) && response_datalen > 0) {
+    if (response_data && response_datalen > 0) {
         len -= response_datalen;
     } else {
         len -= 2;
     }
     header_str =  utils_data_to_text(data, len);
     logger_log(conn->raop->logger, LOGGER_DEBUG, "\n%s", header_str);
-
-    /* the hls_response data of the hls_handler should not be displayed or free'd */
     
     bool data_is_plist = (strstr(header_str,"apple-binary-plist") != NULL);
-    bool data_is_text = (strstr(header_str,"text/") != NULL);
+    bool data_is_text = (strstr(header_str,"text/") != NULL ||
+                         strstr(header_str, "x-mpegURL") != NULL);
     free(header_str);
     if (response_data) {
         if (response_datalen > 0 && logger_debug) {
@@ -438,7 +427,7 @@ conn_request(void *ptr, http_request_t *request, http_response_t **response) {
                 free(data_str);
             }
         }
-        if (free_response_data) {
+        if (response_data) {
             free(response_data);
 	}
     }

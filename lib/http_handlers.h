@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022 fduncanh
+ * Copyright (c) 2024 fduncanh
  * All Rights Reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -18,9 +18,6 @@
 
 #include "airplay_video.h"
 #include "fcup_request.h"
-
-typedef void (*hls_handler_t)(raop_conn_t *, http_request_t *,
-                               http_response_t *, const char **, int *);
 
 static void
 http_handler_server_info(raop_conn_t *conn, http_request_t *request, http_response_t *response,
@@ -103,7 +100,8 @@ http_handler_scrub(raop_conn_t *conn, http_request_t *request, http_response_t *
 	double value = strtod(position, &end);
 	if (end && end != position) {
 	  scrub_position = (float) value;
-	  logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_scrub: got position = %.6f", scrub_position);	  
+	  logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_scrub: got position = %.6f",
+                     scrub_position);	  
 	}
     }
     conn->raop->callbacks.on_video_scrub(conn->raop->callbacks.cls, scrub_position);
@@ -138,14 +136,11 @@ http_handler_fpsetup2(raop_conn_t *conn, http_request_t *request, http_response_
     http_response_add_header(response, "Content-Type", "application/x-apple-binary-plist");
     int req_datalen;
     const unsigned char *req_data = (unsigned char *) http_request_get_data(request, &req_datalen);
-    logger_log(conn->raop->logger, LOGGER_ERR, "only FairPlay version 0x03 is implemented, version is 0x%2.2x", req_data[4]);
+    logger_log(conn->raop->logger, LOGGER_ERR, "only FairPlay version 0x03 is implemented, version is 0x%2.2x",
+               req_data[4]);
     http_response_destroy(response);
     response = http_response_init("HTTP/1.1", 421, "Misdirected Request");
 }
-
-
-
-
 
 // called by http_handler_playback_info to respond to a GET /playback_info request from the client.
 
@@ -177,8 +172,6 @@ int create_playback_info_plist_xml(playback_info_t *playback_info, char **plist_
 
     plist_t loaded_time_ranges_node = plist_new_array();
 
-    printf("num_loaded_time_ranges %d\n",playback_info->num_loaded_time_ranges);
-    
     for (int i = 0 ; i < playback_info->num_loaded_time_ranges; i++) {
         assert (i < MAX_TIME_RANGES);
 	time_range_t *time_range = &playback_info->loadedTimeRanges[i];
@@ -208,30 +201,26 @@ int create_playback_info_plist_xml(playback_info_t *playback_info, char **plist_
     plist_to_xml(res_root_node, plist_xml, (uint32_t *) &len);
     plist_free(res_root_node);
 
-
-    /* remove a final /n (suggested by apssk-public code):  is this necessary when using plist_to_xml? */
+    /* remove a final /n (suggested by apsdk-public code):  is this necessary when using plist_to_xml? */
     len --;
     (*plist_xml)[len] = '\0';
-    
-    // printf("[%s]", *plist_xml);
-    
     
     return len;
 }
 
-
-// this adds a time range (duration, start) of time-range_type = "loadedTimeRange" or "seekableTimeRange"
-// to the playback info struc, and increments the appropiate counter by 1.  Not more than
-// MAX_TIME_RANGES of a give typen may be added.
+// this adds a time range (duration, start) of time-range_type = "loadedTimeRange" or
+// "seekableTimeRange" to the playback_info struct, and increments the appropriate counter by 1. 
+// Not more than MAX_TIME_RANGES of a give type may be added.
 // returns 0 for success, -1 for failure.
 
-int add_playback_info_time_range(playback_info_t *playback_info, const char *time_range_type, double duration, double start) {
+int add_playback_info_time_range(playback_info_t *playback_info, const char *time_range_type,
+                                double duration, double start) {
     time_range_t *time_range;
     int *time_range_num;
-     if (!strstr(time_range_type, "loadedTimeRange")) {
+     if (!strcmp(time_range_type, "loadedTimeRange")) {
         time_range_num = &(playback_info->num_loaded_time_ranges);
         time_range = (time_range_t *) &playback_info->loadedTimeRanges[*time_range_num];
-    } else if (!strstr(time_range_type, "seekableTimeRange")) {
+    } else if (!strcmp(time_range_type, "seekableTimeRange")) {
         time_range_num = &(playback_info->num_seekable_time_ranges);
         time_range = (time_range_t *) &playback_info->seekableTimeRanges[*time_range_num];
     } else {
@@ -255,7 +244,6 @@ http_handler_playback_info(raop_conn_t *conn, http_request_t *request, http_resp
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_playback_info");
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
 
-    
     playback_info_t playback_info;
     playback_info.stallcount = 0;
     playback_info.duration = 0.0;
@@ -266,12 +254,10 @@ http_handler_playback_info(raop_conn_t *conn, http_request_t *request, http_resp
     playback_info.playback_likely_to_keep_up = true;
     playback_info.num_loaded_time_ranges = 0;
     playback_info.num_seekable_time_ranges = 0;
-    
-    
+
     conn->raop->callbacks.on_video_acquire_playback_info(conn->raop->callbacks.cls, &playback_info);
     add_playback_info_time_range(&playback_info, "loadedTimeRange", playback_info.duration, 0.0);
     add_playback_info_time_range(&playback_info, "seekableTimeRange", playback_info.duration, 0.0);
-
 
     *response_datalen =  create_playback_info_plist_xml(&playback_info, response_data);
     /* last character (at *response_data[response_datalen - 1]) is  0x0a = '\n'
@@ -279,7 +265,6 @@ http_handler_playback_info(raop_conn_t *conn, http_request_t *request, http_resp
      * apsdk removes the last "\n" by overwriting it with '\0', and reducing response_datalen by 1. 
      * TODO: check if this is necessary  */
 
-    
     http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
 }
 
@@ -296,12 +281,11 @@ http_handler_set_property(raop_conn_t *conn,
         !strcmp(property, "forwardEndTime") ||
         !strcmp(property, "actionAtItemEnd")) {
         logger_log(conn->raop->logger, LOGGER_DEBUG, "property %s is known but unhandled", property);
-      
+
         plist_t errResponse = plist_new_dict();
         plist_t errCode = plist_new_uint(0);
         plist_dict_set_item(errResponse, "errorCode", errCode);
         plist_to_xml(errResponse, response_data, (uint32_t *) response_datalen);
-        printf("%s", *response_data);
         plist_free(errResponse);
         http_response_add_header(response, "Content-Type", "text/x-apple-plist+xml");
     } else {
@@ -310,14 +294,10 @@ http_handler_set_property(raop_conn_t *conn,
     }
 }
 
-
-
-
 static void
 http_handler_reverse(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                      char **response_data, int *response_datalen) {
 
-    
     /* get http socket for send */
     int socket_fd = httpd_get_connection_socket (conn->raop->httpd, (void *) conn);
     if (socket_fd < 0) {
@@ -341,21 +321,19 @@ http_handler_reverse(raop_conn_t *conn, http_request_t *request, http_response_t
 	http_response_add_header(response, "Connection", "Upgrade");
 	http_response_add_header(response, "Upgrade", "PTTH/1.0");
 
-	
     } else {
         logger_log(conn->raop->logger, LOGGER_ERR, "multiple TPPH connections (%d) are forbidden", type_PTTH );
     }    
 }
 
-
-// handlers that use the media_data_store   (c++ code)
+// handlers that use the media_data_store (c++ code)
 
 static void
 http_handler_stop(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                   char **response_data, int *response_datalen) {
     logger_log(conn->raop->logger, LOGGER_INFO, "client HTTP request POST stop");
     void *media_data_store = get_media_data_store(conn->raop);
-    
+
     if (media_data_store) {
         media_data_store_reset(media_data_store);
     } else {
@@ -368,20 +346,20 @@ static void
 http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t *response,
                     char **response_data, int *response_datalen) {
 
-
     bool data_is_plist = false;
     plist_t req_root_node = NULL;
     char *fcup_response_data = NULL;
     char *fcup_response_url = NULL;
     uint64_t uint_val;
     void *media_data_store = NULL;
-
+    int request_id = 0;
+    int fcup_response_statuscode = 0;
+    
     media_data_store = get_media_data_store(conn->raop);
     if (!media_data_store) {
         logger_log(conn->raop->logger, LOGGER_ERR, "media_data_store not found");
         return;
     }
-
 
     const char* session_id = http_request_get_header(request, "X-Apple-Session-ID");
     if (!session_id) {
@@ -405,7 +383,7 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
         logger_log(conn->raop->logger, LOGGER_INFO, "POST /action: did not receive expected plist from client");	
         goto post_action_error;
     }
-    
+
     /* extract the root_node  plist */
     int request_datalen = 0;
     const char *request_data = http_request_get_data(request, &request_datalen);
@@ -435,8 +413,6 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
     } 
     free (type);
 
-
-    uint32_t n_items;
     plist_t req_params_node = NULL;
     switch (action_type) {
     case 1:
@@ -455,57 +431,39 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
       logger_log(conn->raop->logger, LOGGER_INFO, "unknown action type (unhandled)"); 
       goto finish;
     }
-    
-    handle_fcup:
-#if 0
-    n_items =  plist_dict_get_size(req_params_node);
-    plist_dict_iter iter;
-    plist_dict_new_iter(req_params_node, &iter);
-    printf("params is a plist_dict with size %u \n", n_items);
-    for (int i = 0 ; i < (int) n_items; i++) {
-      char *key = NULL;
-      plist_dict_next_item(req_params_node, iter, &key, NULL);
-      printf("Item %d has key %s\n", i, key);
-      if(key){
-          free(key);
-      }
-    }
-    free (iter);
-#endif
-    
+
+ handle_fcup:
+
     /* handling type "unhandledURLResponse" (case 1)*/
     uint_val = 0;
     int fcup_response_datalen = 0;
 
-   // these entries were not used by apsdk
-    int request_id = 0;
-    int fcup_response_statuscode = 0;
-
-    plist_t plist_fcup_response_statuscode_node = plist_dict_get_item(req_params_node, "FCUP_Response_StatusCode");
+    plist_t plist_fcup_response_statuscode_node = plist_dict_get_item(req_params_node,
+                                                                      "FCUP_Response_StatusCode");
     if (plist_fcup_response_statuscode_node) {
         plist_get_uint_val(plist_fcup_response_statuscode_node, &uint_val);
         fcup_response_statuscode = (int) uint_val;
         uint_val = 0;
-        logger_log(conn->raop->logger, LOGGER_INFO, "FCUP_Response_StatusCode = %d", fcup_response_statuscode);
+        logger_log(conn->raop->logger, LOGGER_INFO, "FCUP_Response_StatusCode = %d",
+                   fcup_response_statuscode);
     }
-    
 
-    plist_t plist_fcup_response_requestid_node = plist_dict_get_item(req_params_node, "FCUP_Response_RequestID");
+    plist_t plist_fcup_response_requestid_node = plist_dict_get_item(req_params_node,
+                                                                     "FCUP_Response_RequestID");
     if (plist_fcup_response_requestid_node) {
         plist_get_uint_val(plist_fcup_response_requestid_node, &uint_val);
         request_id = (int) uint_val;
         uint_val = 0;
-        logger_log(conn->raop->logger, LOGGER_DEBUG, "FCUP_Response_RequestID =  %d");
+        logger_log(conn->raop->logger, LOGGER_DEBUG, "FCUP_Response_RequestID =  %d", request_id);
     }
 
-    
     plist_t plist_fcup_response_url_node = plist_dict_get_item(req_params_node, "FCUP_Response_URL");
     if (plist_fcup_response_url_node) {
         plist_get_string_val(plist_fcup_response_url_node, &fcup_response_url);
         if (!fcup_response_url) {
             goto post_action_error;
         }
-        logger_log(conn->raop->logger, LOGGER_DEBUG, "FCUP_Response_URL =  %s");
+        logger_log(conn->raop->logger, LOGGER_DEBUG, "FCUP_Response_URL =  %s", fcup_response_url);
     }
 
 	
@@ -517,51 +475,25 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
         fcup_response_datalen = (int) uint_val;
         uint_val = 0;
 	
-        if (logger_get_level(conn->raop->logger) >= LOGGER_DEBUG) {
-            int count = 0;
-            char * ptr = fcup_response_data;
-            const char blk[] = "#EXT-X-";
-            for (int i = 0; i < fcup_response_datalen; i++) {
-                if (!strncmp(ptr,blk, strlen(blk))) {
-                    printf("\n");
-                    count = 0;
-                }
-                count++;
-                printf("%c",  *ptr);
-                ptr++;
-                if (count%80 == 79) {
-                    printf("\n");
-                }
-            }
-            printf("\n");
-        }
 	free (fcup_response_data);
-        printf("*** datalen = %d\n", fcup_response_datalen);
         if (!fcup_response_datalen) {
 	    free (fcup_response_url);
 	    goto post_action_error;
         }
-    }
-    
+    } 
 
-    printf("**************process_media_data**************\n");
-    char *playback_location = process_media_data(media_data_store, fcup_response_url, fcup_response_data, fcup_response_datalen);
-    printf("********  process_media_data return location = \"%s\"  *************************\n", playback_location);
+    char *playback_location = process_media_data(media_data_store, fcup_response_url,
+                                                 fcup_response_data, fcup_response_datalen);
+
     /* play, if location != NULL */
     if (playback_location) {  
-        conn->raop->callbacks.on_video_play(conn->raop->callbacks.cls, playback_location, get_start_position_seconds(conn->airplay_video));
+        conn->raop->callbacks.on_video_play(conn->raop->callbacks.cls, playback_location,
+					    get_start_position_seconds(conn->airplay_video));
         free (playback_location);
     }
-    
+
  finish:
     plist_free(req_root_node);
-    
-    plist_t response_node = plist_new_dict();
-    plist_t errorcode_node = plist_new_uint(0);
-    plist_dict_set_item(response_node, "errorCode", errorcode_node);
-    plist_to_xml(response_node, response_data, (uint32_t *) response_datalen);
-    plist_free(response_node);
-    http_response_add_header(response, "Content-Type", "application/x-apple-plist+xml");
     return;
 
  post_action_error:;
@@ -572,29 +504,6 @@ http_handler_action(raop_conn_t *conn, http_request_t *request, http_response_t 
       plist_free(req_root_node);
     }
 }
-
-static void
-http_handler_hls(raop_conn_t *conn,  http_request_t *request, http_response_t *response,
-			  const char **response_data, int *response_datalen) {
-    const char *url = http_request_get_url(request);
-    void *media_data_store = NULL;
-
-    media_data_store = get_media_data_store(conn->raop);
-    if (!media_data_store) {
-        logger_log(conn->raop->logger, LOGGER_ERR, "media_data_store not found");
-        return;
-    }
-    *response_datalen = query_media_data(media_data_store, url, response_data);
-    http_response_add_header(response, "Access-Control-Allow-Headers", "Content-type");
-    http_response_add_header(response, "Access-Control-Allow-Origin", "*");
-    
-    if (*response_datalen > 0) {
-        http_response_add_header(response, "Content-Type", "application/x-mpegURL; charset=utf-8");
-    } else if (*response_datalen == 0) {
-      http_response_destroy(response);
-      response = http_response_init("HTTP/1.1", 404, "Not Found");
-    } 
- }
 
 static void
 http_handler_play(raop_conn_t *conn, http_request_t *request, http_response_t *response,
@@ -610,14 +519,12 @@ http_handler_play(raop_conn_t *conn, http_request_t *request, http_response_t *r
     bool ret;
 
     logger_log(conn->raop->logger, LOGGER_DEBUG, "http_handler_play");
-    printf("airplay_video is at %p\n", conn->airplay_video);
     media_data_store = get_media_data_store(conn->raop);
     if (!media_data_store) {
       logger_log(conn->raop->logger, LOGGER_ERR, "media_data_store not found, conn = %p", conn);
 
         return;
     }
-    printf("media_data_store is at %p\n", media_data_store);
 
     const char* session_id = http_request_get_header(request, "X-Apple-Session-ID");
     if (!session_id) {
@@ -633,7 +540,7 @@ http_handler_play(raop_conn_t *conn, http_request_t *request, http_response_t *r
       
     int request_datalen = -1;    
     const char *request_data = http_request_get_data(request, &request_datalen);
-    printf("handler_play 2\n");    
+
     if (request_datalen > 0) {
         char *header_str = NULL;
         http_request_get_header_string(request, &header_str);
@@ -687,9 +594,8 @@ http_handler_play(raop_conn_t *conn, http_request_t *request, http_response_t *r
         }
 	set_start_position_seconds(conn->airplay_video, (float) start_position_seconds);
     }
-    //printf("http handler play: request_media_data %s %s %p\n", playback_location, session_id, media_data_store);
+
     ret = request_media_data(media_data_store, playback_location, apple_session_id);
-    //printf("return from request_media, ret = %d\n", ret);
     
     if (!ret) {
         /* normal play, not HLS: assume location is valid */
@@ -708,7 +614,6 @@ http_handler_play(raop_conn_t *conn, http_request_t *request, http_response_t *r
      return;
 
  play_error:;
-    printf("play_error\n");
     if (req_root_node) {
       plist_free(req_root_node);
     }
@@ -717,3 +622,35 @@ http_handler_play(raop_conn_t *conn, http_request_t *request, http_response_t *r
     response = http_response_init("HTTP/1.1", 400, "Bad Request");
 }
 
+static void
+http_handler_hls(raop_conn_t *conn,  http_request_t *request, http_response_t *response,
+                 char **response_data, int *response_datalen) {
+    const char *method = http_request_get_method(request);
+    assert (!strcmp(method, "GET"));
+    const char *url = http_request_get_url(request);    
+    void *media_data_store = NULL;    	    
+    const char* upgrade = http_request_get_header(request, "Upgrade");
+    if (upgrade) {
+      //don't accept Upgrade: h2c request ?
+      return;
+    }
+    media_data_store = get_media_data_store(conn->raop);
+    if (!media_data_store) {
+        logger_log(conn->raop->logger, LOGGER_ERR, "media_data_store not found");
+        return;
+    }
+
+    *response_data = query_media_data(media_data_store, url, response_datalen);
+
+    http_response_add_header(response, "Access-Control-Allow-Headers", "Content-type");
+    http_response_add_header(response, "Access-Control-Allow-Origin", "*");
+    const char *date;
+    date = gmt_time_string();
+    http_response_add_header(response, "Date", date);
+    if (*response_datalen > 0) {
+        http_response_add_header(response, "Content-Type", "application/x-mpegURL; charset=utf-8");
+    } else if (*response_datalen == 0) {
+      http_response_destroy(response);
+      response = http_response_init("HTTP/1.1", 404, "Not Found");
+    }
+ }

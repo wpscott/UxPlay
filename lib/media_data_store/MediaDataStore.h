@@ -18,8 +18,9 @@
  *  You should have received a copy of the GNU General Public License along with this. 
  *  If not, see <https://www.gnu.org/licenses/>.
  *==============================================================================
- * modified by fduncanh (2024)                                                                                                                                        * based on class ap_casting_media_data_store of                                                                                                                     
- * http://github.com/air-display/apsdk-public                                                                                                                         */                                               
+ * modified by fduncanh (2024)
+ * based on class ap_casting_media_data_store of  http://github.com/air-display/apsdk-public
+ */
 
 #pragma once
 #include <map>
@@ -30,7 +31,7 @@
 #include <mutex>
 
 extern "C" {
-  int  fcup_request(void *conn_opaque, const char *url, const char *session_id, int request_id);
+  int  fcup_request(void *conn_opaque, const char *uri, const char *session_id, int request_id);
 }
 
 class MediaDataStore {
@@ -93,21 +94,8 @@ class MediaDataStore {
   /// </summary>
   typedef std::map<std::string, std::string> media_data;
 
-private:
-
-  app_id app_id_;
-  uint32_t request_id_;
-  std::string session_id_;
-  std::string primary_uri_;
-  std::stack<std::string> uri_stack_;
-
-  std::string host_;
-  media_data media_data_;
-  std::mutex mtx_;
-  void *conn_opaque_;
 public:
 
-  
   MediaDataStore();
 
   ~MediaDataStore();
@@ -134,7 +122,7 @@ protected:
 
   static bool is_primary_data_uri(const std::string &uri);
 
-  void send_fcup_request(std::string uri, std::string session_id, int request_id);
+  void send_fcup_request(const std::string uri, std::string session_id, int request_id);
 
   std::string adjust_primary_uri(const std::string &uri);
 
@@ -150,4 +138,16 @@ protected:
   // For Netflix
   std::string adjust_nfhls_data(const std::string &data);
 
+private:
+
+  app_id app_id_;
+  uint32_t request_id_;
+  std::string session_id_;
+  std::string primary_uri_;
+  std::stack<std::string> uri_stack_;
+
+  std::string host_;
+  media_data media_data_;
+  std::mutex mtx_;
+  void *conn_opaque_;
 };
