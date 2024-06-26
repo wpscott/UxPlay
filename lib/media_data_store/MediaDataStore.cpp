@@ -294,10 +294,10 @@ extern "C" char *process_media_data(void *media_data_store, const char *url, con
     const std::string uri(url);
     auto location = static_cast<MediaDataStore*>(media_data_store)->process_media_data(uri, data, datalen) ;
     if (!location.empty()) {
-        size_t len = location.length();
-        char * location_str = (char *) malloc(len + 1);
-        snprintf(location_str, len + 1, "%s", location.c_str());
-        location_str[len] = '\0';
+        size_t len = location.size();
+	len++;
+        char *location_str = (char *) std::malloc(len);
+	std::strncpy(location_str, location.c_str(), len);
         return location_str; //must be freed after use
     }
     return NULL;
@@ -309,17 +309,18 @@ extern "C" bool request_media_data(void *media_data_store, const char *primary_u
     return static_cast<MediaDataStore*>(media_data_store)->request_media_data(primary_uri, session_id);
 }
 
-extern "C" char *query_media_data(void *media_data_store, const char *url, int *len) {
+extern "C" char *query_media_data(void *media_data_store, const char *url, int *size) {
     const std::string path = url;
     std::string data =  static_cast<MediaDataStore*>(media_data_store)->query_media_data(path);
     if (data.empty()) {
-        *len = 0;
+        *size = 0;
         return NULL;
     }
-    *len = (int) data.length();
-    char *response_data = (char *) std::malloc(data.size() + 1);  
-    std::strncpy(response_data, data.c_str(), data.size());
-    response_data[*len] = '\0';
+    size_t len = data.length();
+    *size = (int) len;
+    len++;
+    char *response_data = (char *) std::malloc(len);  
+    std::strncpy(response_data, data.c_str(), len);
     return response_data;  // must be freed after use
 }
 
