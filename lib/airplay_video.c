@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2019 dsafa22 and 2014 Joakim Plate, modified by Florian Draschbacher,
+/**
+ * Copyright (c) 2024 fduncanh
  * All Rights Reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -12,11 +12,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * Lesser General Public License for more details.
  *
- *=================================================================
- * modified by fduncanh 2021-23
  */
 
-// Some of the code in here comes from https://github.com/juhovh/shairplay/pull/25/files
 
 //airplay_video service should handle interactions with the media player, such as pause, stop, start, scrub  etc.
 // it should only start and stop the media_data_store that handles all HLS transactions, without
@@ -26,14 +23,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
-#include <errno.h>
+//#include <errno.h>
 #include <assert.h>
 #include <plist/plist.h>
-//#include <gst/gst.h>
 
 #include "raop.h"
-#include "threads.h"
-#include "compat.h"
+//#include "compat.h"
 #include "utils.h"
 #include "airplay_video.h"
 
@@ -47,10 +42,6 @@ struct airplay_video_s {
     char playback_uuid[37];
     float start_position_seconds;
     playback_info_t *playback_info;
-    thread_handle_t thread;
-    mutex_handle_t run_mutex;
-    mutex_handle_t wait_mutex;
-    cond_handle_t wait_cond;
 
     // The local port of the airplay server on the AirPlay server
     unsigned short airplay_port;
@@ -58,10 +49,6 @@ struct airplay_video_s {
     // the TCP socket used for reverse  HTTP
     int rsock;
   
-    /* MUTEX LOCKED VARIABLES START */
-    /* These variables only edited mutex locked */
-    int running;
-    int joined;
 };
 
 
@@ -99,45 +86,6 @@ int set_playback_info_item(airplay_video_t *airplay_video, const char *item, int
     return 0;
 }
 
-
-
-// a thread for the airplay_video server, (may not be necessary, but included in case it is)
-
-static THREAD_RETVAL
-airplay_video_thread(void *arg)
-{
-    airplay_video_t *airplay_video = arg;
-    assert(airplay_video);
-
-    //bool logger_debug = (logger_get_level(airplay_video->logger) >= LOGGER_DEBUG);
-      
-    while (1) {
-        MUTEX_LOCK(airplay_video->run_mutex);
-        if (!airplay_video->running) {
-            MUTEX_UNLOCK(airplay_video->run_mutex);
-            break;
-        }
-        MUTEX_UNLOCK(airplay_video->run_mutex);
-
-        logger_log(airplay_video->logger, LOGGER_INFO, "airplay_video_service thread is running");
-
-        // Sleep for 3 seconds
-        struct timespec wait_time;
-        MUTEX_LOCK(airplay_video->wait_mutex);
-        clock_gettime(CLOCK_REALTIME, &wait_time);
-        wait_time.tv_sec += 3;
-        pthread_cond_timedwait(&airplay_video->wait_cond, &airplay_video->wait_mutex, &wait_time);
-        MUTEX_UNLOCK(airplay_video->wait_mutex);
-    }
-
-    // Ensure running reflects the actual state
-    MUTEX_LOCK(airplay_video->run_mutex);
-    airplay_video->running = false;
-    MUTEX_UNLOCK(airplay_video->run_mutex);
-
-    logger_log(airplay_video->logger, LOGGER_DEBUG, "airplay_video exiting thread");
-    return 0;
-}
 
 
 //  initialize airplay_video service.
@@ -178,84 +126,17 @@ airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *
 
     airplay_video->start_position_seconds = 0.0f;
     
-    airplay_video->running = 0;
-    airplay_video->joined = 1;
 
 
-    MUTEX_CREATE(airplay_video->run_mutex);
-    MUTEX_CREATE(airplay_video->wait_mutex);
-    COND_CREATE(airplay_video->wait_cond);
     return airplay_video;
 }
 
 
-// start the already-initialized airplay_video service by  creating a thread
-void
-airplay_video_service_start(airplay_video_t *airplay_video)
-{
-    logger_log(airplay_video->logger, LOGGER_DEBUG, "airplay_video_service is starting");
-
-
-    MUTEX_LOCK(airplay_video->run_mutex);
-    if (airplay_video->running || !airplay_video->joined) {
-        MUTEX_UNLOCK(airplay_video->run_mutex);
-        return;
-    }
-    
-    /* Create the thread and initialize running values */
-    airplay_video->running = 1;
-    airplay_video->joined = 0;
-    
-    THREAD_CREATE(airplay_video->thread, airplay_video_thread, airplay_video);
-    MUTEX_UNLOCK(airplay_video->run_mutex);
-}
-
-//stop the airplay_video thread
-void
-airplay_video_service_stop(airplay_video_t *airplay_video)
-{
-    assert(airplay_video);
-
-    /* Check that we are running and thread is not
-     * joined (should never be while still running) */
-    MUTEX_LOCK(airplay_video->run_mutex);
-    if (!airplay_video->running || airplay_video->joined) {
-        MUTEX_UNLOCK(airplay_video->run_mutex);
-        return;
-    }
-    airplay_video->running = 0;
-    MUTEX_UNLOCK(airplay_video->run_mutex);
-
-    logger_log(airplay_video->logger, LOGGER_DEBUG, "airplay_video stopping airplay_video_service thread");
-
-    MUTEX_LOCK(airplay_video->wait_mutex);
-    COND_SIGNAL(airplay_video->wait_cond);
-    MUTEX_UNLOCK(airplay_video->wait_mutex);
-    /*
-    // should the TCP socket for airplay video be closed
-    if (raop_ntp->tsock != -1) {
-        closesocket(raop_ntp->tsock);
-        raop_ntp->tsock = -1;
-    }
-    */
-    THREAD_JOIN(airplay_video->thread);
-
-    logger_log(airplay_video->logger, LOGGER_DEBUG, "airplay_video stopped airplay_video_service thread");
-
-    /* Mark thread as joined */
-    MUTEX_LOCK(airplay_video->run_mutex);
-    airplay_video->joined = 1;
-    MUTEX_UNLOCK(airplay_video->run_mutex);
-}
 
 // destroy the airplay_video service
 void
 airplay_video_service_destroy(airplay_video_t *airplay_video)
 {
-    airplay_video_service_stop(airplay_video);
-    MUTEX_DESTROY(airplay_video->run_mutex);
-    MUTEX_DESTROY(airplay_video->wait_mutex);
-    COND_DESTROY(airplay_video->wait_cond);
 
     void* media_data_store = NULL;
     /* destroys media_data_store if called with media_data_store = NULL */
