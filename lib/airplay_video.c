@@ -28,8 +28,6 @@
 
 struct airplay_video_s {
     raop_t *raop;
-    logger_t *logger;
-    raop_callbacks_t callbacks;
     void *conn_opaque;
     char apple_session_id[37];
     char playback_uuid[37];
@@ -73,11 +71,9 @@ int set_playback_info_item(airplay_video_t *airplay_video, const char *item, int
 }
 
 //  initialize airplay_video service.
-airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *callbacks, void *conn_opaque,
-                                            raop_t *raop, unsigned short http_port, const char *session_id) {
+airplay_video_t *airplay_video_service_init(void *conn_opaque, raop_t *raop, unsigned short http_port,
+                                            const char *session_id) {
     void *media_data_store = NULL;
-    assert(logger);
-    assert(callbacks);
     assert(conn_opaque);
     assert(raop);
     airplay_video_t *airplay_video =  (airplay_video_t *) calloc(1, sizeof(airplay_video_t));
@@ -88,11 +84,8 @@ airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *
     /* destroy any existing media_data_store and create a new instance*/
     set_media_data_store(raop, media_data_store);  
     media_data_store = media_data_store_create(conn_opaque, http_port);
-    logger_log(logger, LOGGER_DEBUG, "airplay_video_service_init: media_data_store created at %p", media_data_store);
     set_media_data_store(raop, media_data_store);
 
-    airplay_video->logger = logger;
-    memcpy(&airplay_video->callbacks, callbacks, sizeof(raop_callbacks_t));
     airplay_video->raop = raop;
     airplay_video->conn_opaque = conn_opaque;
 

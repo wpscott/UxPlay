@@ -84,10 +84,10 @@ http_handler_server_info(raop_conn_t *conn, http_request_t *request, http_respon
     /* initialize the aiplay video service */
     const char *session_id = http_request_get_header(request, "X-Apple-Session-ID");
 
-    conn->airplay_video =  (void *) airplay_video_service_init(conn->raop->logger, &(conn->raop->callbacks), conn,
-                                                               conn->raop, conn->raop->port, session_id);
+    conn->airplay_video =  (void *) airplay_video_service_init(conn, conn->raop, conn->raop->port, session_id);
 
-    logger_log(conn->raop->logger, LOGGER_DEBUG, "media_data_store accessible at %p", get_media_data_store(conn->raop));
+    logger_log(conn->raop->logger, LOGGER_DEBUG, "media_data_store accessible at %p",
+               get_media_data_store(conn->raop));
 }
 
 static void

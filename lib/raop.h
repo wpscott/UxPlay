@@ -97,10 +97,11 @@ struct raop_callbacks_s {
 };
 typedef struct raop_callbacks_s raop_callbacks_t;
 raop_ntp_t *raop_ntp_init(logger_t *logger, raop_callbacks_t *callbacks, const char *remote,
-                          int remote_addr_len, unsigned short timing_rport, timing_protocol_t *time_protocol);
+                          int remote_addr_len, unsigned short timing_rport,
+                          timing_protocol_t *time_protocol);
 
-airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *callbacks, void *conn,
-                                            raop_t *raop, unsigned short port, const char *session_id);
+airplay_video_t *airplay_video_service_init(void *conn, raop_t *raop, unsigned short port,
+                                            const char *session_id);
   
 RAOP_API raop_t *raop_init(raop_callbacks_t *callbacks);
 RAOP_API int raop_init2(raop_t *raop, int nohold, const char *device_id, const char *keyfile);
