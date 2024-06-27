@@ -14,24 +14,17 @@
  *
  */
 
-
-//airplay_video service should handle interactions with the media player, such as pause, stop, start, scrub  etc.
 // it should only start and stop the media_data_store that handles all HLS transactions, without
-// otherwise participating in them
+// otherwise participating in them.  
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
-//#include <errno.h>
 #include <assert.h>
-#include <plist/plist.h>
 
 #include "raop.h"
-//#include "compat.h"
-#include "utils.h"
 #include "airplay_video.h"
-
 
 struct airplay_video_s {
     raop_t *raop;
@@ -42,16 +35,9 @@ struct airplay_video_s {
     char playback_uuid[37];
     float start_position_seconds;
     playback_info_t *playback_info;
-
     // The local port of the airplay server on the AirPlay server
     unsigned short airplay_port;
-
-    // the TCP socket used for reverse  HTTP
-    int rsock;
-  
 };
-
-
 
 int set_playback_info_item(airplay_video_t *airplay_video, const char *item, int num, float *val) {
     playback_info_t *playback_info = airplay_video->playback_info;
@@ -86,13 +72,9 @@ int set_playback_info_item(airplay_video_t *airplay_video, const char *item, int
     return 0;
 }
 
-
-
 //  initialize airplay_video service.
-
 airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *callbacks, void *conn_opaque,
                                             raop_t *raop, unsigned short http_port, const char *session_id) {
-
     void *media_data_store = NULL;
     assert(logger);
     assert(callbacks);
@@ -109,11 +91,6 @@ airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *
     logger_log(logger, LOGGER_DEBUG, "airplay_video_service_init: media_data_store created at %p", media_data_store);
     set_media_data_store(raop, media_data_store);
 
-    //    char *plist_xml;
-    //airplay_video_acquire_playback_info(airplay_video, "session_id", &plist_xml);   
-    //printf("%s\n", plist_xml);
-    //free (plist_xml);
-      
     airplay_video->logger = logger;
     memcpy(&airplay_video->callbacks, callbacks, sizeof(raop_callbacks_t));
     airplay_video->raop = raop;
@@ -125,23 +102,16 @@ airplay_video_t *airplay_video_service_init(logger_t *logger, raop_callbacks_t *
     (airplay_video->apple_session_id)[len] = '\0';
 
     airplay_video->start_position_seconds = 0.0f;
-    
-
-
     return airplay_video;
 }
-
-
 
 // destroy the airplay_video service
 void
 airplay_video_service_destroy(airplay_video_t *airplay_video)
 {
-
     void* media_data_store = NULL;
     /* destroys media_data_store if called with media_data_store = NULL */
     set_media_data_store(airplay_video->raop, media_data_store);
-    
 }
 
 const char *get_apple_session_id(airplay_video_t *airplay_video) {
