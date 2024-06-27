@@ -33,6 +33,17 @@ http_handler_server_info(raop_conn_t *conn, http_request_t *request, http_respon
 
     plist_t r_node = plist_new_dict();
 
+    /* first 12 AirPlay features bits (R to L): 0x27F = 0010 0111 1111
+     * Only bits 0-6 and bit 9  are set:
+     * 0. video supported
+     * 1. photo supported
+     * 2. video protected wirh FairPlay DRM
+     * 3. volume control supported for video
+     * 4. HLS supported
+     * 5. slideshow supported
+     * 6. (unknown)
+     * 9. audio supported.
+     */
     plist_t features_node = plist_new_uint(0x27F); 
     plist_dict_set_item(r_node, "features", features_node);
 
