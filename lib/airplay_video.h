@@ -25,20 +25,13 @@
 
 typedef struct airplay_video_s airplay_video_t;
 
-int airplay_video_acquire_playback_info(airplay_video_t *airplay_video, const char *session_id, char **plist_xml);
 int set_playback_info_item(airplay_video_t *airplay_video, const char *item, int num, float *val);
+
 const char *get_apple_session_id(airplay_video_t *airplay_video);
 void set_start_position_seconds(airplay_video_t *airplay_video, float start_position_seconds);
 float get_start_position_seconds(airplay_video_t *airplay_video);
 void set_playback_uuid(airplay_video_t *airplay_video, const char *playback_uuid);
   
-void airplay_video_stop(airplay_video_t *airplay_video, const char *session_id);
-void airplay_video_rate(airplay_video_t *airplay_video, const char *session_id, float rate);
-void airplay_video_play(airplay_video_t *airplay_video, const char *session_id, const char *location, float start_position);
-void airplay_video_scrub(airplay_video_t *airplay_video, const char *session_id, float scrub_position);
-
-void airplay_video_service_start(airplay_video_t *airplay_video);
-void airplay_video_service_stop(airplay_video_t *airplay_video);
 void airplay_video_service_destroy(airplay_video_t *airplay_video);
 
 //  C wrappers for c++ class MediaDataStore
