@@ -112,6 +112,7 @@ airplay_video_service_destroy(airplay_video_t *airplay_video)
     void* media_data_store = NULL;
     /* destroys media_data_store if called with media_data_store = NULL */
     set_media_data_store(airplay_video->raop, media_data_store);
+    free (airplay_video);
 }
 
 const char *get_apple_session_id(airplay_video_t *airplay_video) {
