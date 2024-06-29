@@ -18,8 +18,10 @@
 #if defined(WIN32)
 #include <ws2tcpip.h>
 #include <windows.h>
+#if !defined(_MSC_VER)
 #ifndef snprintf
 #define snprintf _snprintf
+#endif
 #endif
 #else
 #include <sys/types.h>

@@ -18,14 +18,14 @@ void playfair_decrypt(unsigned char* message3, unsigned char* cipherText, unsign
 	unsigned char blockIn[16];
 	unsigned char sapKey[16];
 	uint32_t key_schedule[11][4];
-	generate_session_key(default_sap, message3, sapKey);	
+	generate_session_key(default_sap, message3, sapKey);
 	generate_key_schedule(sapKey, key_schedule);
 	z_xor(chunk2, blockIn, 1);
 	cycle(blockIn, key_schedule);
-	for (i = 0; i < 16; i++) {
+	for (i = 0; i < 16; i++)
+	{
 		keyOut[i] = blockIn[i] ^ chunk1[i];
 	}
 	x_xor(keyOut, keyOut, 1);
 	z_xor(keyOut, keyOut, 1);
 }
-

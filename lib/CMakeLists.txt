@@ -65,13 +65,24 @@ if ( APPLE )
                          playfair
                          llhttp )
 elseif( WIN32 )
-  target_link_libraries( airplay 
-                         pthread
-                         playfair
-                         llhttp
-                         wsock32
-			 iphlpapi
-                         ws2_32 )
+  if (MSVC)
+    target_link_libraries( airplay 
+                           playfair
+                           llhttp
+                           wsock32
+                           iphlpapi
+                           ws2_32 )
+    find_package(PThreads4W REQUIRED)
+    target_link_libraries( airplay PThreads4W::PThreads4W)
+  else()
+    target_link_libraries( airplay 
+                           pthread
+                           playfair
+                           llhttp
+                           wsock32
+                           iphlpapi
+                           ws2_32 )
+  endif()
 else()
   target_link_libraries( airplay PUBLIC
           pthread
@@ -84,11 +95,15 @@ pkg_search_module(PLIST REQUIRED libplist-2.0)
 if ( PLIST_FOUND )
    message( STATUS "found libplist-${PLIST_VERSION}" )
 endif()
-if( APPLE OR WIN32 )
+if( APPLE )
    # use static linking
    find_library( LIBPLIST libplist-2.0.a REQUIRED )
    message( STATUS "(Static linking) LIBPLIST " ${LIBPLIST} )
    target_link_libraries ( airplay  ${LIBPLIST} )
+elseif( WIN32 )
+  find_library( LIBPLIST plist-2.0.lib REQUIRED )
+  message( STATUS "(Static linking) LIBPLIST " ${LIBPLIST} )
+  target_link_libraries( airplay ${LIBPLIST} )
 else ()
   find_library( LIBPLIST ${PLIST_LIBRARIES} PATH ${PLIST_LIBDIR} )
   target_link_libraries ( airplay PUBLIC ${LIBPLIST} )

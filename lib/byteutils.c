@@ -14,7 +14,7 @@
  *=================================================================
  * modified by fduncanh 2021-23
  */
- 
+
 
 #define SECOND_IN_NSECS 1000000000UL
 
@@ -48,80 +48,89 @@
 /**
  * Reads a little endian unsigned 16 bit integer from the buffer at position offset
  */
-uint16_t byteutils_get_short(unsigned char* b, int offset) {
-    return *((uint16_t*)(b + offset));
+uint16_t byteutils_get_short(unsigned char* b, int offset)
+{
+	return *((uint16_t*)(b + offset));
 }
 
 /**
  * Reads a little endian unsigned 32 bit integer from the buffer at position offset
  */
-uint32_t byteutils_get_int(unsigned char* b, int offset) {
-    return *((uint32_t*)(b + offset));
+uint32_t byteutils_get_int(unsigned char* b, int offset)
+{
+	return *((uint32_t*)(b + offset));
 }
 
 /**
  * Reads a little endian unsigned 64 bit integer from the buffer at position offset
  */
-uint64_t byteutils_get_long(unsigned char* b, int offset) {
-    return *((uint64_t*)(b + offset));
+uint64_t byteutils_get_long(unsigned char* b, int offset)
+{
+	return *((uint64_t*)(b + offset));
 }
 
 /**
  * Reads a big endian unsigned 16 bit integer from the buffer at position offset
  */
-uint16_t byteutils_get_short_be(unsigned char* b, int offset) {
-    return ntohs(byteutils_get_short(b, offset));
+uint16_t byteutils_get_short_be(unsigned char* b, int offset)
+{
+	return ntohs(byteutils_get_short(b, offset));
 }
 
 /**
  * Reads a big endian unsigned 32 bit integer from the buffer at position offset
  */
-uint32_t byteutils_get_int_be(unsigned char* b, int offset) {
-    return ntohl(byteutils_get_int(b, offset));
+uint32_t byteutils_get_int_be(unsigned char* b, int offset)
+{
+	return ntohl(byteutils_get_int(b, offset));
 }
 
 /**
  * Reads a big endian unsigned 64 bit integer from the buffer at position offset
  */
-uint64_t byteutils_get_long_be(unsigned char* b, int offset) {
-    return ntohll(byteutils_get_long(b, offset));
+uint64_t byteutils_get_long_be(unsigned char* b, int offset)
+{
+	return ntohll(byteutils_get_long(b, offset));
 }
 
 /**
  * Reads a float from the buffer at position offset
  */
-float byteutils_get_float(unsigned char* b, int offset) {
-    return *((float*)(b + offset));
+float byteutils_get_float(unsigned char* b, int offset)
+{
+	return *((float*)(b + offset));
 }
 
 /**
  * Writes a little endian unsigned 32 bit integer to the buffer at position offset
  */
-void byteutils_put_int(unsigned char* b, int offset, uint32_t value) {
-    *((uint32_t*)(b + offset)) = value;
+void byteutils_put_int(unsigned char* b, int offset, uint32_t value)
+{
+	*((uint32_t*)(b + offset)) = value;
 }
 
 /**
  * Reads an ntp timestamp and returns it as nano seconds since the Unix epoch
  */
-uint64_t byteutils_get_ntp_timestamp(unsigned char *b, int offset) {
-    uint64_t seconds = ntohl(((unsigned int) byteutils_get_int(b, offset))) - SECONDS_FROM_1900_TO_1970;
-    uint64_t fraction = ntohl((unsigned int) byteutils_get_int(b, offset + 4));
-    return (seconds * SECOND_IN_NSECS) + ((fraction * SECOND_IN_NSECS) >> 32);
+uint64_t byteutils_get_ntp_timestamp(unsigned char* b, int offset)
+{
+	uint64_t seconds = ntohl(((unsigned int)byteutils_get_int(b, offset))) - SECONDS_FROM_1900_TO_1970;
+	uint64_t fraction = ntohl((unsigned int)byteutils_get_int(b, offset + 4));
+	return (seconds * SECOND_IN_NSECS) + ((fraction * SECOND_IN_NSECS) >> 32);
 }
 
 /**
  * Writes a time given as nano seconds since the Unix time epoch as an ntp timestamp
  * into the buffer at position offset
  */
-void byteutils_put_ntp_timestamp(unsigned char *b, int offset, uint64_t ns_since_1970) {
-    uint64_t seconds = ns_since_1970 / SECOND_IN_NSECS;
-    uint64_t nanoseconds = ns_since_1970 % SECOND_IN_NSECS;
-    seconds += SECONDS_FROM_1900_TO_1970;
-    uint64_t fraction = (nanoseconds << 32) / SECOND_IN_NSECS;
+void byteutils_put_ntp_timestamp(unsigned char* b, int offset, uint64_t ns_since_1970)
+{
+	uint64_t seconds = ns_since_1970 / SECOND_IN_NSECS;
+	uint64_t nanoseconds = ns_since_1970 % SECOND_IN_NSECS;
+	seconds += SECONDS_FROM_1900_TO_1970;
+	uint64_t fraction = (nanoseconds << 32) / SECOND_IN_NSECS;
 
-    // Write in big endian!
-    byteutils_put_int(b, offset, htonl(seconds));
-    byteutils_put_int(b, offset + 4, htonl(fraction));
+	// Write in big endian!
+	byteutils_put_int(b, offset, htonl(seconds));
+	byteutils_put_int(b, offset + 4, htonl(fraction));
 }
-

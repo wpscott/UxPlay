@@ -23,19 +23,20 @@
 #include "logger.h"
 #include "compat.h"
 
-struct logger_s {
+struct logger_s
+{
 	mutex_handle_t lvl_mutex;
 	mutex_handle_t cb_mutex;
 
 	int level;
-	void *cls;
+	void* cls;
 	logger_callback_t callback;
 };
 
-logger_t *
+logger_t*
 logger_init()
 {
-	logger_t *logger = calloc(1, sizeof(logger_t));
+	logger_t* logger = calloc(1, sizeof(logger_t));
 	assert(logger);
 
 	MUTEX_CREATE(logger->lvl_mutex);
@@ -47,7 +48,7 @@ logger_init()
 }
 
 void
-logger_destroy(logger_t *logger)
+logger_destroy(logger_t* logger)
 {
 	MUTEX_DESTROY(logger->lvl_mutex);
 	MUTEX_DESTROY(logger->cb_mutex);
@@ -55,7 +56,7 @@ logger_destroy(logger_t *logger)
 }
 
 void
-logger_set_level(logger_t *logger, int level)
+logger_set_level(logger_t* logger, int level)
 {
 	assert(logger);
 
@@ -65,20 +66,20 @@ logger_set_level(logger_t *logger, int level)
 }
 
 int
-logger_get_level(logger_t *logger)
+logger_get_level(logger_t* logger)
 {
-        int level;   
-        assert(logger);
+	int level;
+	assert(logger);
 
 	MUTEX_LOCK(logger->lvl_mutex);
 	level = logger->level;
 	MUTEX_UNLOCK(logger->lvl_mutex);
 
-        return level;
+	return level;
 }
 
 void
-logger_set_callback(logger_t *logger, logger_callback_t callback, void *cls)
+logger_set_callback(logger_t* logger, logger_callback_t callback, void* cls)
 {
 	assert(logger);
 
@@ -88,15 +89,15 @@ logger_set_callback(logger_t *logger, logger_callback_t callback, void *cls)
 	MUTEX_UNLOCK(logger->cb_mutex);
 }
 
-static char *
-logger_utf8_to_local(const char *str)
+static char*
+logger_utf8_to_local(const char* str)
 {
-	char *ret = NULL;
+	char* ret = NULL;
 
-/* FIXME: This is only implemented on Windows for now */
+	/* FIXME: This is only implemented on Windows for now */
 #if defined(_WIN32) || defined(_WIN64)
 	int wclen, mblen;
-	WCHAR *wcstr;
+	WCHAR* wcstr;
 	BOOL failed;
 
 	wclen = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
@@ -104,7 +105,8 @@ logger_utf8_to_local(const char *str)
 	MultiByteToWideChar(CP_UTF8, 0, str, -1, wcstr, wclen);
 
 	mblen = WideCharToMultiByte(CP_ACP, 0, wcstr, wclen, NULL, 0, NULL, &failed);
-	if (failed) {
+	if (failed)
+	{
 		/* Invalid characters in input, conversion failed */
 		free(wcstr);
 		return NULL;
@@ -119,37 +121,43 @@ logger_utf8_to_local(const char *str)
 }
 
 void
-logger_log(logger_t *logger, int level, const char *fmt, ...)
+logger_log(logger_t* logger, int level, const char* fmt, ...)
 {
 	char buffer[4096];
 	va_list ap;
 
 	MUTEX_LOCK(logger->lvl_mutex);
-	if (level > logger->level) {
+	if (level > logger->level)
+	{
 		MUTEX_UNLOCK(logger->lvl_mutex);
 		return;
 	}
 	MUTEX_UNLOCK(logger->lvl_mutex);
 
-	buffer[sizeof(buffer)-1] = '\0';
+	buffer[sizeof(buffer) - 1] = '\0';
 	va_start(ap, fmt);
-	vsnprintf(buffer, sizeof(buffer)-1, fmt, ap);
+	vsnprintf(buffer, sizeof(buffer) - 1, fmt, ap);
 	va_end(ap);
 
 	MUTEX_LOCK(logger->cb_mutex);
-	if (logger->callback) {
+	if (logger->callback)
+	{
 		logger->callback(logger->cls, level, buffer);
 		MUTEX_UNLOCK(logger->cb_mutex);
-	} else {
-		char *local;
+	}
+	else
+	{
+		char* local;
 		MUTEX_UNLOCK(logger->cb_mutex);
 		local = logger_utf8_to_local(buffer);
-		if (local) {
+		if (local)
+		{
 			fprintf(stderr, "%s\n", local);
 			free(local);
-		} else {
+		}
+		else
+		{
 			fprintf(stderr, "%s\n", buffer);
 		}
 	}
 }
-

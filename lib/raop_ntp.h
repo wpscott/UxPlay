@@ -43,4 +43,8 @@ uint64_t raop_ntp_get_remote_time(raop_ntp_t *raop_ntp);
 uint64_t raop_ntp_convert_remote_time(raop_ntp_t *raop_ntp, uint64_t remote_time);
 uint64_t raop_ntp_convert_local_time(raop_ntp_t *raop_ntp, uint64_t local_time);
 
+#ifdef _WIN32
+#define CLOCK_REALTIME 0
+#endif
+
 #endif //RAOP_NTP_H
