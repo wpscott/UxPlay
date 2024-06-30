@@ -883,23 +883,7 @@ static void append_hostname(std::string& server_name)
 		std::string name = server_name;
 		name.append("@");
 		name.append(buffer);
-
-		const std::string codepage_str = name;
-		int size = MultiByteToWideChar(CP_ACP, 0, codepage_str.c_str(),
-		                               codepage_str.length(), nullptr, 0);
-		std::wstring utf16_str(size, '\0');
-		MultiByteToWideChar(CP_ACP, 0, codepage_str.c_str(),
-		                    codepage_str.length(), utf16_str.data(), size);
-
-		const int utf8_size = WideCharToMultiByte(CP_UTF8, 0, utf16_str.c_str(),
-		                                          utf16_str.length(), nullptr, 0,
-		                                          nullptr, nullptr);
-		std::string utf8_str(utf8_size, '\0');
-		WideCharToMultiByte(CP_UTF8, 0, utf16_str.c_str(),
-		                    utf16_str.length(), utf8_str.data(), utf8_size,
-		                    nullptr, nullptr);
-
-		server_name = utf8_str;
+		server_name = name;
 	}
 #else
 	struct utsname buf;
@@ -2630,6 +2614,23 @@ int main(const int argc, char* argv[])
 	{
 		append_hostname(server_name);
 	}
+#if defined(_WIN32) && defined(_MSC_VER)
+	const std::string codepage_str = server_name;
+	int size = MultiByteToWideChar(CP_ACP, 0, codepage_str.c_str(),
+	                               codepage_str.length(), nullptr, 0);
+	std::wstring utf16_str(size, '\0');
+	MultiByteToWideChar(CP_ACP, 0, codepage_str.c_str(),
+	                    codepage_str.length(), utf16_str.data(), size);
+
+	const int utf8_size = WideCharToMultiByte(CP_UTF8, 0, utf16_str.c_str(),
+	                                          utf16_str.length(), nullptr, 0,
+	                                          nullptr, nullptr);
+	std::string utf8_str(utf8_size, '\0');
+	WideCharToMultiByte(CP_UTF8, 0, utf16_str.c_str(),
+	                    utf16_str.length(), utf8_str.data(), utf8_size,
+	                    nullptr, nullptr);
+	server_name = utf8_str;
+#endif
 
 	auto path = std::filesystem::current_path() / "gstreamer";
 	if (!gstreamer_init(path.string().c_str()))
